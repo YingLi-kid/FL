@@ -1,10 +1,18 @@
 # FL音坊 · Fluentic Audio Workshop
 
-[中文](README.md) | **English** | [Official user guide](https://www.fluentic.cn/config/soft/)
+[中文](README.md) | **English** | [Download preview](https://github.com/YingLi-kid/FL/releases/tag/v1.0) | [Official user guide](https://www.fluentic.cn/config/soft/)
 
 An Android voice cloning and text-to-speech client built with Kotlin, Jetpack Compose, and Material 3. The current provider is Alibaba Cloud Model Studio CosyVoice. Bring your own API key.
 
 > Early version: the core workflow has been verified on an Android emulator. Device compatibility and failure handling are still being improved. The repository is named FL.
+
+## Download
+
+[**Download FL音坊 1.0 public preview APK**](https://github.com/YingLi-kid/FL/releases/download/v1.0/FLYinFang.apk) · [Release notes and previous versions](https://github.com/YingLi-kid/FL/releases) · [SHA-256 checksums](https://github.com/YingLi-kid/FL/releases/download/v1.0/SHA256SUMS.txt)
+
+Requires Android 7.0 or later. Download `FLYinFang.apk` from the release assets; the automatically generated Source code archives are not installable Android packages. You must configure your own Alibaba Cloud API key after installation.
+
+This is a public preview. An existing development Debug build may have a different signing certificate and cannot necessarily be updated in place. Save important audio and configuration before deciding to uninstall it; uninstalling deletes local app data.
 
 ## About the name
 
@@ -88,6 +96,16 @@ macOS / Linux:
 
 The first build needs network access to download Gradle, plugins, and dependencies; JDK auto-resolution may also require network access. The APK is written to `app/build/outputs/apk/debug/app-debug.apk`. Install it through Android Studio or with `adb install -r <APK-path>`.
 
+## Signed release builds
+
+Debug APKs are for development. For public distribution, build a Release APK using a signing key that you will retain for future updates.
+
+1. Prepare your own Android release keystore and keep it in your local `signing/` directory.
+2. Copy `keystore.properties.example` to the root `keystore.properties` and fill in the local keystore path, alias, and passwords.
+3. Run `gradlew.bat assembleRelease` (or `./gradlew assembleRelease` on macOS/Linux). With valid signing configuration, the signed APK is written to `app/build/outputs/apk/release/app-release.apk`.
+
+Without local signing configuration, the Release build produces an unsigned APK that is not ready for public installation. Git ignores `signing/` and `keystore.properties`. Back up the keystore and passwords separately and use the same signing key for later updates. Never upload signing material or real credentials to the repository.
+
 ## Tests
 
 - `RegressionTest` covers draft restoration, missing-key prompts, credential input, back navigation, cache removal, actual media duration, voice persistence and menu updates, and audio pause/replay.
@@ -118,7 +136,7 @@ app/src/main/java/com/example/myapplication/
 - Coverage across device manufacturers, unreliable networks, background transitions, and process termination is incomplete. Restoring a form does not guarantee that a cloud task continues in every situation.
 - Pending voice status is polled while the app runs; no background scheduler is implemented. Removing a local voice entry does not delete the provider's cloud voice.
 - Full synthesis history, account synchronization, online updates, and an English interface are not implemented. The update action explains that no online update service is connected.
-- Credential encryption, backup policy, versioning, and release signing need further work before a production release. The current application ID is `com.example.myapplication` and its version is `1.0`.
+- Credential encryption, backup policy, and future version management need further work. The public preview APK uses a dedicated release signing key, which maintainers must back up as described above. The current application ID is `com.example.myapplication` and its version is `1.0`.
 - Not every combination of language, preset voice, and model has been validated. Refer to current provider documentation for pricing and capabilities.
 
 Report problems through [Issues](https://github.com/YingLi-kid/FL/issues), including device model, Android version, reproduction steps, and redacted errors. Do not attach API keys or recordings without permission.

@@ -13,6 +13,7 @@ local.properties
 *.iml
 
 # Credentials, signing keys and local environment
+/signing/
 .env
 .env.*
 !.env.example

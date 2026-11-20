@@ -1,9 +1,31 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
 }
 
+// Release credentials stay on the developer's machine and are ignored by Git.
+val releaseSigningFile = rootProject.file("keystore.properties")
+val releaseSigningProperties = Properties().apply {
+    if (releaseSigningFile.isFile) releaseSigningFile.inputStream().use { load(it) }
+}
+
 android {
+    if (releaseSigningFile.isFile) {
+        signingConfigs {
+            create("release") {
+                fun requiredValue(name: String): String =
+                    requireNotNull(releaseSigningProperties.getProperty(name)?.takeIf { it.isNotBlank() }) {
+                        "Missing release signing property: $name"
+                    }
+                storeFile = rootProject.file(requiredValue("storeFile"))
+                storePassword = requiredValue("storePassword")
+                keyAlias = requiredValue("keyAlias")
+                keyPassword = requiredValue("keyPassword")
+            }
+        }
+    }
     namespace = "com.example.myapplication"
     compileSdk {
         version = release(37)
@@ -21,9 +43,9 @@ android {
 
     buildTypes {
         release {
+            if (releaseSigningFile.isFile) signingConfig = signingConfigs.getByName("release")
             optimization {
                 enable = true
-                packageScope = setOf("androidx.**", "kotlin.**", "kotlinx.**")
             }
         }
     }

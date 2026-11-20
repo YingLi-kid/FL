@@ -1,10 +1,18 @@
 # FL音坊
 
-**中文** | [English](README.en.md) | [官方使用文档](https://www.fluentic.cn/config/soft/)
+**中文** | [English](README.en.md) | [下载测试版](https://github.com/YingLi-kid/FL/releases/tag/v1.0) | [官方使用文档](https://www.fluentic.cn/config/soft/)
 
 基于 Kotlin、Jetpack Compose 和 Material 3 的 Android 声音复刻与文字转语音客户端。当前接入阿里云百炼 CosyVoice，使用者自行提供 API Key。
 
 > 早期版本：核心流程已在 Android 模拟器验证，仍在完善真机兼容性与异常场景处理。仓库名称为 FL。
+
+## 下载
+
+[**下载 FL音坊 1.0 公开测试版 APK**](https://github.com/YingLi-kid/FL/releases/download/v1.0/FLYinFang.apk) · [发布说明及历史版本](https://github.com/YingLi-kid/FL/releases) · [SHA-256 校验文件](https://github.com/YingLi-kid/FL/releases/download/v1.0/SHA256SUMS.txt)
+
+支持 Android 7.0 及以上。请下载发布附件中的 `FLYinFang.apk`；GitHub 自动生成的 Source code 压缩包是源码，不能直接安装。安装后仍需自行配置阿里云 API Key。
+
+首版为公开测试版。如果手机此前安装了开发用 Debug 包，可能因签名不同而无法直接覆盖；请先保存所需音频和必要配置，再决定是否卸载旧包。卸载会删除应用本地数据。
 
 ## 名称由来
 
@@ -88,6 +96,16 @@ macOS / Linux：
 
 首次构建需要联网下载 Gradle、插件和依赖；JDK 自动解析也可能需要联网。APK 位于 `app/build/outputs/apk/debug/app-debug.apk`。通过 Android Studio 安装到模拟器或手机，或执行 `adb install -r <APK路径>`。
 
+## 正式签名打包
+
+Debug APK 用于开发测试。公开分发时应使用你自己长期保管的签名文件构建 Release APK。
+
+1. 准备自己的 Android 发布密钥，将其放在本机 `signing/` 目录。
+2. 将 `keystore.properties.example` 复制为根目录的 `keystore.properties`，填写本地密钥路径、别名和密码。
+3. 执行 `gradlew.bat assembleRelease`（macOS/Linux 使用 `./gradlew assembleRelease`）。配置完整时，签名 APK 输出为 `app/build/outputs/apk/release/app-release.apk`。
+
+未提供本地签名配置时，Release 构建仍会生成未签名安装包，不能直接作为公开安装包使用。`signing/` 和 `keystore.properties` 已被 Git 忽略；请独立备份签名文件及密码，后续更新应使用同一签名。不要把签名材料或真实密钥上传到仓库。
+
 ## 测试
 
 - `RegressionTest` 覆盖草稿恢复、无密钥提示、密钥输入、返回导航、缓存清理、真实媒体时长、音色存储与列表更新、音频暂停及重播。
@@ -118,7 +136,7 @@ app/src/main/java/com/example/myapplication/
 - 尚未充分覆盖不同品牌真机、弱网、后台切换和系统终止进程等场景。表单恢复不等于云端任务在所有情况下都能继续执行。
 - 待审核音色在 APP 运行时轮询，尚未实现后台任务调度；本地删除音色记录不会删除服务商云端音色。
 - 尚无完整的合成历史管理、账号同步、在线更新或英文界面。检查更新入口会说明尚未接入在线更新服务。
-- 密钥加密、备份策略、版本号及发布签名仍需在正式发布前完善。当前应用 ID 为 `com.example.myapplication`，版本为 `1.0`。
+- 密钥加密、备份策略及后续版本管理仍需完善；公开测试安装包使用独立发布签名，维护者应按上方说明备份签名材料。当前应用 ID 为 `com.example.myapplication`，版本为 `1.0`。
 - 语言选择、预设音色与模型的全部组合尚未逐项验证。费用说明与服务能力应以服务商最新文档为准。
 
 欢迎通过 [Issues](https://github.com/YingLi-kid/FL/issues)反馈问题。请附上设备型号、Android 版本、复现步骤与脱敏后的错误提示，不要附带 API Key 或未经授权的录音。
