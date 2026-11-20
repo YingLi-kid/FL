@@ -69,7 +69,7 @@ import com.example.myapplication.ui.theme.MyApplicationTheme
 import com.example.myapplication.ui.theme.TechCyan
 import kotlinx.coroutines.launch
 
-private const val APP_VERSION = "1.0"
+private const val APP_VERSION = "1.0.1"
 private const val OFFICIAL_DOCS_URL = "https://www.fluentic.cn/config/soft/"
 private const val DEVELOPER_EMAIL = "administrator@fluentic.cn"
 

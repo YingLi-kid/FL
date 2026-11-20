@@ -1,6 +1,8 @@
 # FL音坊 · Fluentic Audio Workshop
 
-[中文](README.md) | **English** | [Download preview](https://github.com/YingLi-kid/FL/releases/tag/v1.0) | [Official user guide](https://www.fluentic.cn/config/soft/)
+<img src="branding/fl-fox.png" alt="FL音坊" width="128" />
+
+[中文](README.md) | **English** | [Download preview](https://github.com/YingLi-kid/FL/releases/tag/v1.0.1) | [Official user guide](https://www.fluentic.cn/config/soft/)
 
 An Android voice cloning and text-to-speech client built with Kotlin, Jetpack Compose, and Material 3. The current provider is Alibaba Cloud Model Studio CosyVoice. Bring your own API key.
 
@@ -8,7 +10,7 @@ An Android voice cloning and text-to-speech client built with Kotlin, Jetpack Co
 
 ## Download
 
-[**Download FL音坊 1.0 public preview APK**](https://github.com/YingLi-kid/FL/releases/download/v1.0/FLYinFang.apk) · [Release notes and previous versions](https://github.com/YingLi-kid/FL/releases) · [SHA-256 checksums](https://github.com/YingLi-kid/FL/releases/download/v1.0/SHA256SUMS.txt)
+[**Download FL音坊 1.0.1 public preview APK**](https://github.com/YingLi-kid/FL/releases/download/v1.0.1/FLYinFang.apk) · [Release notes and previous versions](https://github.com/YingLi-kid/FL/releases) · [SHA-256 checksums](https://github.com/YingLi-kid/FL/releases/download/v1.0.1/SHA256SUMS.txt)
 
 Requires Android 7.0 or later. Download `FLYinFang.apk` from the release assets; the automatically generated Source code archives are not installable Android packages. You must configure your own Alibaba Cloud API key after installation.
 

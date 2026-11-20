@@ -1,6 +1,8 @@
 # FL音坊
 
-**中文** | [English](README.en.md) | [下载测试版](https://github.com/YingLi-kid/FL/releases/tag/v1.0) | [官方使用文档](https://www.fluentic.cn/config/soft/)
+<img src="branding/fl-fox.png" alt="FL音坊" width="128" />
+
+**中文** | [English](README.en.md) | [下载测试版](https://github.com/YingLi-kid/FL/releases/tag/v1.0.1) | [官方使用文档](https://www.fluentic.cn/config/soft/)
 
 基于 Kotlin、Jetpack Compose 和 Material 3 的 Android 声音复刻与文字转语音客户端。当前接入阿里云百炼 CosyVoice，使用者自行提供 API Key。
 
@@ -8,7 +10,7 @@
 
 ## 下载
 
-[**下载 FL音坊 1.0 公开测试版 APK**](https://github.com/YingLi-kid/FL/releases/download/v1.0/FLYinFang.apk) · [发布说明及历史版本](https://github.com/YingLi-kid/FL/releases) · [SHA-256 校验文件](https://github.com/YingLi-kid/FL/releases/download/v1.0/SHA256SUMS.txt)
+[**下载 FL音坊 1.0.1 公开测试版 APK**](https://github.com/YingLi-kid/FL/releases/download/v1.0.1/FLYinFang.apk) · [发布说明及历史版本](https://github.com/YingLi-kid/FL/releases) · [SHA-256 校验文件](https://github.com/YingLi-kid/FL/releases/download/v1.0.1/SHA256SUMS.txt)
 
 支持 Android 7.0 及以上。请下载发布附件中的 `FLYinFang.apk`；GitHub 自动生成的 Source code 压缩包是源码，不能直接安装。安装后仍需自行配置阿里云 API Key。
 
