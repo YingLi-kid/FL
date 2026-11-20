@@ -197,7 +197,7 @@ private fun MainScaffold(
             TopAppBar(
                 title = {
                     Text(
-                        text = "音色工坊",
+                        text = "FL音坊",
                         style = MaterialTheme.typography.titleLarge.copy(brush = TechAccentBrush)
                     )
                 },

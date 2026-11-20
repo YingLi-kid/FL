@@ -1,10 +1,14 @@
-# FL · Voice Workshop
+# FL音坊 · Fluentic Audio Workshop
 
 [中文](README.md) | **English**
 
 An Android voice cloning and text-to-speech client built with Kotlin, Jetpack Compose, and Material 3. The current provider is Alibaba Cloud Model Studio CosyVoice. Bring your own API key.
 
-> Early version: the core workflow has been verified on an Android emulator. Device compatibility and failure handling are still being improved. The app is currently named “音色工坊” (Voice Workshop); the repository is named FL.
+> Early version: the core workflow has been verified on an Android emulator. Device compatibility and failure handling are still being improved. The repository is named FL.
+
+## About the name
+
+“FL音坊” takes its name from `fluentic`, the domain name of the author's personal website. It conveys the idea of a workshop for fluent music processing.
 
 ## Features
 

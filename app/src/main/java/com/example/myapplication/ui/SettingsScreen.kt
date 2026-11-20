@@ -75,8 +75,9 @@ private const val DEVELOPER_EMAIL = "administrator@fluentic.cn"
 private data class InfoDoc(val title: String, val body: String)
 
 private val aboutDoc = InfoDoc(
-    title = "关于音色工坊",
-    body = "音色工坊是一款 AI 音频处理工具，提供两大核心功能：\n\n" +
+    title = "关于FL音坊",
+    body = "FL音坊的名字源于个人网站域名 fluentic，寓意「流利的音乐处理工坊」。\n\n" +
+        "FL音坊是一款 AI 音频处理工具，提供两大核心功能：\n\n" +
         "1. 克隆音色：用一段本人语音样本，复刻出专属音色，支持多国语言；\n" +
         "2. 文字转语音：把文字合成为自然语音，可使用预设音色或你克隆出的音色。\n\n" +
         "已接入阿里云百炼 CosyVoice。配置并启用服务商后可进行声音复刻与语音合成。"
@@ -84,7 +85,7 @@ private val aboutDoc = InfoDoc(
 
 private val userAgreement = InfoDoc(
     title = "用户协议",
-    body = "欢迎使用音色工坊。使用本应用即表示你同意：\n\n" +
+    body = "欢迎使用FL音坊。使用本应用即表示你同意：\n\n" +
         "1. 不得利用本应用从事任何违法违规活动；\n" +
         "2. 本应用源码按 GNU GPL v3.0 授权，使用、修改和分发源码时请遵守该许可证；\n" +
         "3. 音色克隆功能仅可用于本人声音，或已获得明确授权的他人声音；\n" +
@@ -190,7 +191,7 @@ fun SettingsScreen(
                     }
                     Spacer(Modifier.width(16.dp))
                     Column {
-                        Text("音色工坊", style = MaterialTheme.typography.titleMedium)
+                        Text("FL音坊", style = MaterialTheme.typography.titleMedium)
                         Spacer(Modifier.height(2.dp))
                         Text(
                             "版本 $APP_VERSION",

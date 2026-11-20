@@ -1,10 +1,14 @@
-# FL · 音色工坊
+# FL音坊
 
 **中文** | [English](README.en.md)
 
 基于 Kotlin、Jetpack Compose 和 Material 3 的 Android 声音复刻与文字转语音客户端。当前接入阿里云百炼 CosyVoice，使用者自行提供 API Key。
 
-> 早期版本：核心流程已在 Android 模拟器验证，仍在完善真机兼容性与异常场景处理。应用内名称暂为「音色工坊」，仓库名称为 FL。
+> 早期版本：核心流程已在 Android 模拟器验证，仍在完善真机兼容性与异常场景处理。仓库名称为 FL。
+
+## 名称由来
+
+「FL音坊」的名字源于作者个人网站域名中的 `fluentic`，寓意「流利的音乐处理工坊」。
 
 ## 功能
 

@@ -3,7 +3,7 @@ package com.example.myapplication.data
 import java.util.UUID
 
 /*
- * 音色工坊 · 数据模型（纯 Kotlin，无 Compose 依赖）。
+ * FL音坊 · 数据模型（纯 Kotlin，无 Compose 依赖）。
  *
  * 阿里云百炼 CosyVoice 接入后：
  *   - VoiceOption.speaker 为 CosyVoice 音色 ID（预设或复刻 voice_id）；
