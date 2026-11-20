@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- 深色启动主题：避免冷启动时白屏闪烁 -->
+    <style name="Theme.MyApplication" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/tech_bg</item>
+        <item name="android:statusBarColor">@color/tech_bg</item>
+        <item name="android:navigationBarColor">@color/tech_bg</item>
+    </style>
+</resources>
