@@ -1,6 +1,6 @@
 # FL音坊
 
-**中文** | [English](README.en.md)
+**中文** | [English](README.en.md) | [官方使用文档](https://www.fluentic.cn/config/soft/)
 
 基于 Kotlin、Jetpack Compose 和 Material 3 的 Android 声音复刻与文字转语音客户端。当前接入阿里云百炼 CosyVoice，使用者自行提供 API Key。
 
@@ -8,7 +8,7 @@
 
 ## 名称由来
 
-「FL音坊」的名字源于作者个人网站域名中的 `fluentic`，寓意「流利的音乐处理工坊」。
+「FL音坊」的名字源于作者个人网站域名中的 `fluentic`，寓意「流利的音色处理工坊」。
 
 ## 功能
 
@@ -23,6 +23,8 @@
 目前仅阿里云服务商已接入，数据模型为后续扩展保留了入口。界面主要为中文，中英文 README 不代表 APP 已有英文界面。
 
 ## 使用方法
+
+完整教程请查看[FL音坊官方使用文档](https://www.fluentic.cn/config/soft/)，APP 设置页也提供入口。
 
 1. 在[阿里云百炼控制台](https://bailian.console.aliyun.com/)开通所需语音模型服务，创建可访问相应模型的 API Key。当前代码使用北京地域接口。
 2. 打开 APP → 右上角「设置」→「服务商管理」→「阿里云 · 百炼 CosyVoice」，填写密钥并启用。

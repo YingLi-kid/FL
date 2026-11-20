@@ -1,6 +1,6 @@
 # FL音坊 · Fluentic Audio Workshop
 
-[中文](README.md) | **English**
+[中文](README.md) | **English** | [Official user guide](https://www.fluentic.cn/config/soft/)
 
 An Android voice cloning and text-to-speech client built with Kotlin, Jetpack Compose, and Material 3. The current provider is Alibaba Cloud Model Studio CosyVoice. Bring your own API key.
 
@@ -8,7 +8,7 @@ An Android voice cloning and text-to-speech client built with Kotlin, Jetpack Co
 
 ## About the name
 
-“FL音坊” takes its name from `fluentic`, the domain name of the author's personal website. It conveys the idea of a workshop for fluent music processing.
+“FL音坊” takes its name from `fluentic`, the domain name of the author's personal website. It conveys the idea of a workshop for fluent voice and timbre processing.
 
 ## Features
 
@@ -23,6 +23,8 @@ An Android voice cloning and text-to-speech client built with Kotlin, Jetpack Co
 Only Alibaba Cloud is currently implemented. The data model leaves room for additional providers. The app interface is primarily Chinese; bilingual documentation does not imply an English app interface.
 
 ## Getting started
+
+See the [official FL音坊 user guide](https://www.fluentic.cn/config/soft/) for the full tutorial. It is also accessible from the app settings.
 
 1. Enable the required speech model services in the [Alibaba Cloud Model Studio console](https://bailian.console.aliyun.com/) and create an API key with access to them. The current code uses the Beijing-region endpoint.
 2. Open the app → **设置** (Settings) → **服务商管理** (Providers) → **阿里云 · 百炼 CosyVoice**. Enter the key and enable the provider.

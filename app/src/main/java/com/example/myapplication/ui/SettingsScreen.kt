@@ -57,6 +57,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -69,6 +70,7 @@ import com.example.myapplication.ui.theme.TechCyan
 import kotlinx.coroutines.launch
 
 private const val APP_VERSION = "1.0"
+private const val OFFICIAL_DOCS_URL = "https://www.fluentic.cn/config/soft/"
 private const val DEVELOPER_EMAIL = "administrator@fluentic.cn"
 
 // 各类弹窗文本
@@ -76,7 +78,7 @@ private data class InfoDoc(val title: String, val body: String)
 
 private val aboutDoc = InfoDoc(
     title = "关于FL音坊",
-    body = "FL音坊的名字源于个人网站域名 fluentic，寓意「流利的音乐处理工坊」。\n\n" +
+    body = "FL音坊的名字源于个人网站域名 fluentic，寓意「流利的音色处理工坊」。\n\n" +
         "FL音坊是一款 AI 音频处理工具，提供两大核心功能：\n\n" +
         "1. 克隆音色：用一段本人语音样本，复刻出专属音色，支持多国语言；\n" +
         "2. 文字转语音：把文字合成为自然语音，可使用预设音色或你克隆出的音色。\n\n" +
@@ -120,7 +122,7 @@ private val openSourceLicenses = InfoDoc(
 )
 
 /**
- * 设置页：服务商管理、关于软件、联系开发者、检查更新、清除缓存、用户协议、隐私政策、免责声明、开源许可。
+ * 设置页：服务商管理、官方使用文档、关于软件、联系开发者、检查更新、清除缓存、用户协议、隐私政策、免责声明、开源许可。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -131,6 +133,7 @@ fun SettingsScreen(
 ) {
     var currentDoc by remember { mutableStateOf<InfoDoc?>(null) }
     val context = LocalContext.current
+    val uriHandler = LocalUriHandler.current
     val clipboardManager = LocalClipboardManager.current
     val scope = rememberCoroutineScope()
 
@@ -234,6 +237,17 @@ fun SettingsScreen(
 
             // 关于与支持
             GlassCard(contentPadding = PaddingValues(0.dp)) {
+                SettingItem(
+                    icon = Icons.Rounded.Description,
+                    title = "官方使用文档",
+                    supporting = "安装、服务商配置与使用教程",
+                    onClick = {
+                        runCatching { uriHandler.openUri(OFFICIAL_DOCS_URL) }.onFailure {
+                            scope.launch { snackbarHostState.showSnackbar("无法打开浏览器，请访问 $OFFICIAL_DOCS_URL") }
+                        }
+                    }
+                )
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 SettingItem(Icons.Rounded.Info, "关于软件") { currentDoc = aboutDoc }
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 SettingItem(
