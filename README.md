@@ -2,19 +2,19 @@
 
 <img src="branding/fl-fox.png" alt="FL音坊" width="128" />
 
-**中文** | [English](README.en.md) | [下载测试版](https://github.com/YingLi-kid/FL/releases/tag/v1.0.1) | [官方使用文档](https://www.fluentic.cn/config/soft/)
+**中文** | [English](README.en.md) | [下载测试版](https://github.com/YingLi-kid/FL/releases/tag/v1.1.0) | [官方使用文档](https://www.fluentic.cn/config/soft/)
 
-基于 Kotlin、Jetpack Compose 和 Material 3 的 Android 声音复刻与文字转语音客户端。当前接入阿里云百炼 CosyVoice，使用者自行提供 API Key。
+基于 Kotlin、Jetpack Compose 和 Material 3 的 Android 声音复刻与文字转语音客户端。支持本地离线模型，也可使用自己的 API Key 调用阿里云百炼 CosyVoice。
 
 > 早期版本：核心流程已在 Android 模拟器验证，仍在完善真机兼容性与异常场景处理。仓库名称为 FL。
 
 ## 下载
 
-[**下载 FL音坊 1.0.1 公开测试版 APK**](https://github.com/YingLi-kid/FL/releases/download/v1.0.1/FLYinFang.apk) · [发布说明及历史版本](https://github.com/YingLi-kid/FL/releases) · [SHA-256 校验文件](https://github.com/YingLi-kid/FL/releases/download/v1.0.1/SHA256SUMS.txt)
+[**下载 FL音坊 1.1.0 公开测试版 APK**](https://github.com/YingLi-kid/FL/releases/download/v1.1.0/FLYinFang.apk) · [发布说明及历史版本](https://github.com/YingLi-kid/FL/releases) · [SHA-256 校验文件](https://github.com/YingLi-kid/FL/releases/download/v1.1.0/SHA256SUMS.txt)
 
-支持 Android 7.0 及以上。请下载发布附件中的 `FLYinFang.apk`；GitHub 自动生成的 Source code 压缩包是源码，不能直接安装。安装后仍需自行配置阿里云 API Key。
+安装包适用于 ARM64 设备，最低系统版本为 Android 7.0；离线克隆和合成需要 Android 12 及以上。请下载发布附件中的 `FLYinFang.apk`。模型权重在安装后单独下载或导入。
 
-首版为公开测试版。如果手机此前安装了开发用 Debug 包，可能因签名不同而无法直接覆盖；请先保存所需音频和必要配置，再决定是否卸载旧包。卸载会删除应用本地数据。
+如果手机此前安装了开发用 Debug 包，可能因签名不同而无法直接覆盖。请在卸载前保存所需音频和必要配置。卸载会删除应用本地数据。
 
 ## 名称由来
 
@@ -24,10 +24,10 @@
 
 - **音色克隆**：现场录音或通过系统文件选择器导入音频；本地校验实际时长为 5～30 秒、大小不超过 10 MB。
 - **审核状态恢复**：服务返回音色 ID 后立即持久化；APP 运行且服务商已配置、启用时，自动查询待审核音色。
-- **文字转语音**：选择预设音色或审核通过的克隆音色，输入最多 500 字符，调整语速、音量和音调。
-- **播放与导出**：播放、暂停、继续、重播，通过系统保存对话框导出 MP3。
+- **文字转语音**：输入最多 2000 字符，语言和发音参数随所选模型变化。
+- **播放、记录与导出**：在生成记录中播放、导出或删除结果。本地模型导出 WAV，阿里云导出 MP3。
 - **草稿保留**：切换标签页、打开设置或发生可恢复的界面重建时保留表单；音频缓存被清理后需要重新选择样本。
-- **服务商配置**：填写并保存自己的密钥，手动启用服务商。未配置密钥时会提示配置，不生成模拟成功结果。
+- **服务商配置**：选择「联网」后使用已保存的密钥。缺少密钥时，应用会提示配置。
 - **深色界面**：霓虹渐变与玻璃风格组件。
 
 目前仅阿里云服务商已接入，数据模型为后续扩展保留了入口。界面主要为中文，中英文 README 不代表 APP 已有英文界面。
@@ -36,8 +36,12 @@
 
 完整教程请查看[FL音坊官方使用文档](https://www.fluentic.cn/config/soft/)，APP 设置页也提供入口。
 
+**本地离线**：在「设置 → 本地模型」选定模型，直接下载，或导入对应的 ZIP。安装完成后在主页选择「本地离线」，即可录制或导入样本、创建音色并合成语音。支持千问 0.6B、千问 1.7B、OmniVoice、IndexTTS 2.5 和离线 CosyVoice 3.0。模型说明见 [千问](QWEN_PROTOTYPE.md)、[OmniVoice](OMNIVOICE_PREVIEW.md) 和 [IndexTTS / CosyVoice](AUDIOCPP_PREVIEW.md)。
+
+**联网**：
+
 1. 在[阿里云百炼控制台](https://bailian.console.aliyun.com/)开通所需语音模型服务，创建可访问相应模型的 API Key。当前代码使用北京地域接口。
-2. 打开 APP → 右上角「设置」→「服务商管理」→「阿里云 · 百炼 CosyVoice」，填写密钥并启用。
+2. 打开 APP → 右上角「设置」→「服务商管理」→「阿里云 · 百炼 CosyVoice」，保存密钥后在主页选择「联网」。
 3. 在「克隆音色」页确认声音授权、填写名称、选择样本语言，然后录音或上传清晰的单人语音。
 4. 点击「开始克隆音色」。音色将显示在「我的音色」中，等待状态变为「可使用」。查询中断时可重新打开 APP 继续查询。
 5. 点击已可用音色，或切换到「文字转语音」选择音色；输入文字并生成，使用播放按钮试听或下载按钮保存。
@@ -52,8 +56,8 @@
 ## 隐私与声音授权
 
 - 仅克隆本人声音或已获得明确授权的声音。
-- 点击克隆时，选定的音频将上传到阿里云；点击生成时，文字、音色 ID 与合成参数会发送到阿里云。请求使用用户填写的密钥鉴权。
-- 密钥和音色档案保存在应用私有目录的 DataStore 中；录音、导入样本与合成结果使用本地缓存，导出的音频保存在用户选择的位置。
+- 联网模式会将克隆样本或合成文字、音色 ID 和参数发送到阿里云。本地离线模式在手机上处理音频和文字。
+- 密钥和音色档案保存在应用私有目录的 DataStore 中。合成成功的音频保存在本机生成记录中，也可以导出到用户选择的位置。
 - **当前密钥存储尚未使用 Android Keystore 加密，系统备份规则也尚未专门排除密钥。** 请使用权限受限的测试密钥，并在共享设备或发布前评估此限制。
 - 仓库不包含可用密钥、账号配置、签名文件、测试录音或生成音频。不要把这些内容提交到 Git。
 
@@ -101,6 +105,8 @@ macOS / Linux：
 ## 正式签名打包
 
 Debug APK 用于开发测试。公开分发时应使用你自己长期保管的签名文件构建 Release APK。
+
+构建带离线功能的签名版时，先按上方模型说明准备三套运行库，再为 `assembleRelease` 加上 `-PflOfflineRelease=true`。
 
 1. 准备自己的 Android 发布密钥，将其放在本机 `signing/` 目录。
 2. 将 `keystore.properties.example` 复制为根目录的 `keystore.properties`，填写本地密钥路径、别名和密码。

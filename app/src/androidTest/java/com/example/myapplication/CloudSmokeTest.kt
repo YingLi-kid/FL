@@ -34,7 +34,7 @@ class CloudSmokeTest {
         compose.onAllNodesWithText("UploadTest1120").onLast().performScrollTo().performClick()
         val text = "这是上传音频克隆后的语音测试。现在确认文字转语音能够正常生成和播放。"
         compose.onNode(hasSetTextAction()).performTextInput(text)
-        compose.onNodeWithText("生成语音").performScrollTo().performClick()
+        compose.onNodeWithText("云端生成").performScrollTo().performClick()
         compose.waitUntil(180000) {
             context.cacheDir.listFiles()?.any { it.name.startsWith("result_") && it.lastModified() >= startedAt } == true
         }

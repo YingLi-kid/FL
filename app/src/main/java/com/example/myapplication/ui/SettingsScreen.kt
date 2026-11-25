@@ -65,11 +65,11 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.example.myapplication.BuildConfig
 import com.example.myapplication.ui.theme.MyApplicationTheme
 import com.example.myapplication.ui.theme.TechCyan
 import kotlinx.coroutines.launch
 
-private const val APP_VERSION = "1.0.1"
 private const val OFFICIAL_DOCS_URL = "https://www.fluentic.cn/config/soft/"
 private const val DEVELOPER_EMAIL = "administrator@fluentic.cn"
 
@@ -82,7 +82,7 @@ private val aboutDoc = InfoDoc(
         "FL音坊是一款 AI 音频处理工具，提供两大核心功能：\n\n" +
         "1. 克隆音色：用一段本人语音样本，复刻出专属音色，支持多国语言；\n" +
         "2. 文字转语音：把文字合成为自然语音，可使用预设音色或你克隆出的音色。\n\n" +
-        "已接入阿里云百炼 CosyVoice。配置并启用服务商后可进行声音复刻与语音合成。"
+        "联网模式已接入阿里云百炼 CosyVoice。保存 API Key 后，在主页选择该服务商即可使用。"
 )
 
 private val userAgreement = InfoDoc(
@@ -98,10 +98,10 @@ private val userAgreement = InfoDoc(
 private val privacyPolicy = InfoDoc(
     title = "隐私政策",
     body = "本应用高度重视你的隐私：\n\n" +
-        "1. 点击克隆时，选定的录音或音频样本会发送至已启用的阿里云服务；点击生成时，合成文字和音色 ID 会发送至该服务；\n" +
+        "1. 联网模式会将录音或合成文字发送至所选服务商。本地模式的录音、文字和语音生成留在设备上；\n" +
         "2. 不要求注册账号，不收集姓名、手机号等个人身份信息；\n" +
         "3. 你自行填写的服务商密钥仅保存在本机，仅用于向对应服务商发起请求；\n" +
-        "4. 麦克风权限用于录音；音频选择和导出通过系统文件选择器完成。"
+        "4. 麦克风权限用于录音，音频选择和导出通过系统文件选择器完成。生成的语音和台词保存在本机，可在生成记录中删除。"
 )
 
 private val disclaimer = InfoDoc(
@@ -129,7 +129,8 @@ private val openSourceLicenses = InfoDoc(
 fun SettingsScreen(
     snackbarHostState: SnackbarHostState,
     onOpenProviderManager: () -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onOpenLocalModels: (() -> Unit)? = null
 ) {
     var currentDoc by remember { mutableStateOf<InfoDoc?>(null) }
     val context = LocalContext.current
@@ -197,11 +198,18 @@ fun SettingsScreen(
                         Text("FL音坊", style = MaterialTheme.typography.titleMedium)
                         Spacer(Modifier.height(2.dp))
                         Text(
-                            "版本 $APP_VERSION",
+                            "版本 ${BuildConfig.VERSION_NAME}",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
+                }
+            }
+
+            onOpenLocalModels?.let { open ->
+                GlassCard(onClick = open) {
+                    Text("本地模型", style = MaterialTheme.typography.titleMedium)
+                    Text("查看模型列表、下载或导入 ZIP", style = MaterialTheme.typography.bodySmall)
                 }
             }
 
@@ -222,7 +230,7 @@ fun SettingsScreen(
                         Text("服务商管理", style = MaterialTheme.typography.titleMedium)
                         Spacer(Modifier.height(2.dp))
                         Text(
-                            "配置语音服务商与 API 密钥",
+                            "配置云服务商与 API 密钥",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

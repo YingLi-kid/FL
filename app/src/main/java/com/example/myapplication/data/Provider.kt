@@ -5,7 +5,7 @@ package com.example.myapplication.data
  *
  * 本应用是「多服务商语音 API 客户端壳」：
  *   - ServiceProvider 是服务商的静态元数据（内置，不可改）；
- *   - ProviderRuntimeConfig 是用户填写的运行配置（密钥 + 启用状态，本地持久化）；
+ *   - ProviderRuntimeConfig 是用户填写的运行配置（密钥，本地持久化）；
  *   - 密钥由使用者自己提供，仅保存在本机，请求时直接发给对应服务商官方 API。
  */
 
@@ -35,7 +35,6 @@ data class ServiceProvider(
 
 // 服务商运行配置（用户填写，持久化）
 data class ProviderRuntimeConfig(
-    val enabled: Boolean = false,
     val credentials: Map<String, String> = emptyMap()
 ) {
     // 是否已填齐全部密钥字段

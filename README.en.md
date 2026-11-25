@@ -2,17 +2,17 @@
 
 <img src="branding/fl-fox.png" alt="FL音坊" width="128" />
 
-[中文](README.md) | **English** | [Download preview](https://github.com/YingLi-kid/FL/releases/tag/v1.0.1) | [Official user guide](https://www.fluentic.cn/config/soft/)
+[中文](README.md) | **English** | [Download preview](https://github.com/YingLi-kid/FL/releases/tag/v1.1.0) | [Official user guide](https://www.fluentic.cn/config/soft/)
 
-An Android voice cloning and text-to-speech client built with Kotlin, Jetpack Compose, and Material 3. The current provider is Alibaba Cloud Model Studio CosyVoice. Bring your own API key.
+An Android voice cloning and text-to-speech client built with Kotlin, Jetpack Compose, and Material 3. Use a local model offline or connect to Alibaba Cloud Model Studio CosyVoice with your own API key.
 
 > Early version: the core workflow has been verified on an Android emulator. Device compatibility and failure handling are still being improved. The repository is named FL.
 
 ## Download
 
-[**Download FL音坊 1.0.1 public preview APK**](https://github.com/YingLi-kid/FL/releases/download/v1.0.1/FLYinFang.apk) · [Release notes and previous versions](https://github.com/YingLi-kid/FL/releases) · [SHA-256 checksums](https://github.com/YingLi-kid/FL/releases/download/v1.0.1/SHA256SUMS.txt)
+[**Download FL音坊 1.1.0 public preview APK**](https://github.com/YingLi-kid/FL/releases/download/v1.1.0/FLYinFang.apk) · [Release notes and previous versions](https://github.com/YingLi-kid/FL/releases) · [SHA-256 checksums](https://github.com/YingLi-kid/FL/releases/download/v1.1.0/SHA256SUMS.txt)
 
-Requires Android 7.0 or later. Download `FLYinFang.apk` from the release assets; the automatically generated Source code archives are not installable Android packages. You must configure your own Alibaba Cloud API key after installation.
+The APK requires an ARM64 device with Android 7.0 or later. Offline cloning and synthesis require Android 12 or later. Download `FLYinFang.apk` from the release assets, then download or import model weights from the app.
 
 This is a public preview. An existing development Debug build may have a different signing certificate and cannot necessarily be updated in place. Save important audio and configuration before deciding to uninstall it; uninstalling deletes local app data.
 
@@ -24,10 +24,10 @@ This is a public preview. An existing development Debug build may have a differe
 
 - **Voice cloning:** record audio or import it through the system picker. The app checks the actual media duration (5–30 seconds) and a 10 MB size limit.
 - **Persistent review status:** voice IDs are stored as soon as the provider returns them. Pending voices are checked while the app is running and the provider is configured and enabled.
-- **Text to speech:** use a preset or an approved cloned voice, enter up to 500 characters, and adjust speed, volume, and pitch.
-- **Playback and export:** play, pause, resume, replay, and export MP3 through the system save dialog.
+- **Text to speech:** enter up to 2,000 characters. Languages and speech controls vary by model.
+- **Playback, history, and export:** play, export, or delete generated audio from history. Local models export WAV and Alibaba Cloud exports MP3.
 - **Draft retention:** preserve forms across tab changes, settings navigation, and supported UI state restoration. Samples must be selected again if their cache files are cleared.
-- **Provider configuration:** save your own key and enable the provider. Missing credentials produce a configuration prompt, not simulated success.
+- **Provider configuration:** save your own key and select online mode on the home screen. The app prompts for missing credentials.
 - **Dark interface:** neon gradients and glass-style components.
 
 Only Alibaba Cloud is currently implemented. The data model leaves room for additional providers. The app interface is primarily Chinese; bilingual documentation does not imply an English app interface.
@@ -36,8 +36,12 @@ Only Alibaba Cloud is currently implemented. The data model leaves room for addi
 
 See the [official FL音坊 user guide](https://www.fluentic.cn/config/soft/) for the full tutorial. It is also accessible from the app settings.
 
+**Offline**: Open **设置 → 本地模型** (Settings → Local models). Download a model in the app or import its matching ZIP. Then select **本地离线** (Offline) on the home screen to create a voice and generate speech. Available models are Qwen 0.6B, Qwen 1.7B, OmniVoice, IndexTTS 2.5, and local CosyVoice 3.0. See [Qwen](QWEN_PROTOTYPE.md), [OmniVoice](OMNIVOICE_PREVIEW.md), and [IndexTTS / CosyVoice](AUDIOCPP_PREVIEW.md).
+
+**Online**:
+
 1. Enable the required speech model services in the [Alibaba Cloud Model Studio console](https://bailian.console.aliyun.com/) and create an API key with access to them. The current code uses the Beijing-region endpoint.
-2. Open the app → **设置** (Settings) → **服务商管理** (Providers) → **阿里云 · 百炼 CosyVoice**. Enter the key and enable the provider.
+2. Open the app → **设置** (Settings) → **服务商管理** (Providers) → **阿里云 · 百炼 CosyVoice**. Save the key, then select **联网** (Online) on the home screen.
 3. Open **克隆音色** (Clone voice), confirm voice authorization, enter a name, select the sample language, and record or upload clear speech from a single speaker.
 4. Start cloning. The entry appears under **我的音色** (My voices); wait for **可使用** (Ready). Reopen the app to resume status checks after an interruption.
 5. Tap a ready voice, or select one in **文字转语音** (Text to speech). Enter text, generate speech, and use the playback or download control.
@@ -52,8 +56,8 @@ See the [official FL音坊 user guide](https://www.fluentic.cn/config/soft/) for
 ## Privacy and voice authorization
 
 - Clone only your own voice or voices for which you have explicit permission.
-- Starting a clone uploads the selected audio to Alibaba Cloud. Starting synthesis sends text, the voice ID, and synthesis parameters to Alibaba Cloud. Requests authenticate with the key supplied by the user.
-- API keys and voice profiles are saved in DataStore in the app-private directory. Recordings, imported samples, and synthesis results use local cache files; exports are written to the location chosen by the user.
+- Online mode sends reference audio or the synthesis text, voice ID, and parameters to Alibaba Cloud. Offline mode processes audio and text on the device.
+- API keys and voice profiles are saved in app-private DataStore. Generated audio is saved in on-device history and can be exported to a location you choose.
 - **Keys are not yet encrypted with Android Keystore, and backup rules do not yet specifically exclude credentials.** Use a restricted test key and assess this limitation before using shared devices or distributing a production release.
 - This repository contains no usable keys, account configuration, signing files, test recordings, or generated audio. Do not commit these files to Git.
 
@@ -99,6 +103,8 @@ macOS / Linux:
 The first build needs network access to download Gradle, plugins, and dependencies; JDK auto-resolution may also require network access. The APK is written to `app/build/outputs/apk/debug/app-debug.apk`. Install it through Android Studio or with `adb install -r <APK-path>`.
 
 ## Signed release builds
+
+To build a signed APK with offline support, prepare all three runtimes using the model guides above and add `-PflOfflineRelease=true` to `assembleRelease`.
 
 Debug APKs are for development. For public distribution, build a Release APK using a signing key that you will retain for future updates.
 

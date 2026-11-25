@@ -22,7 +22,9 @@ val supportedLanguages = listOf(
     LanguageOption("de", "德语"),
     LanguageOption("es", "西班牙语"),
     LanguageOption("ru", "俄语"),
-    LanguageOption("yue", "粤语")
+    LanguageOption("yue", "粤语"),
+    LanguageOption("it", "意大利语"),
+    LanguageOption("pt", "葡萄牙语")
 )
 
 fun languageLabel(code: String): String =
@@ -37,6 +39,16 @@ fun cosyVoiceLanguageHint(code: String): String? = when (code) {
 // 克隆音色的样本来源
 enum class VoiceSource { RECORDED, UPLOADED }
 
+enum class VoiceEngine { ALIYUN, QWEN, OMNIVOICE, INDEX_TTS, COSYVOICE_LOCAL }
+
+fun defaultBackendId(engine: VoiceEngine): String = when (engine) {
+    VoiceEngine.ALIYUN -> "aliyun"
+    VoiceEngine.QWEN -> "qwen3-tts-0.6b-q4km"
+    VoiceEngine.OMNIVOICE -> "omnivoice-q8"
+    VoiceEngine.INDEX_TTS -> "index-tts-2.5-q8"
+    VoiceEngine.COSYVOICE_LOCAL -> "cosyvoice-3-q8"
+}
+
 // 一个已克隆的音色档案
 data class VoiceProfile(
     val id: String = UUID.randomUUID().toString(),
@@ -46,7 +58,9 @@ data class VoiceProfile(
     val sampleSeconds: Int,
     val speakerId: String? = null,          // 阿里云声音复刻返回的 voice_id
     val createdAt: Long = System.currentTimeMillis(),
-    val status: String = "OK"
+    val status: String = "OK",
+    val engine: VoiceEngine = VoiceEngine.ALIYUN,
+    val backendId: String = defaultBackendId(engine)
 )
 
 // 文字转语音可选的音色：预设系统音色 + 用户克隆音色

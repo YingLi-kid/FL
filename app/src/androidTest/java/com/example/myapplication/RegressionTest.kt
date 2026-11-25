@@ -56,7 +56,7 @@ class RegressionTest {
             TtsScreen(emptyList(), null, {}, { message = it }, null)
         } }
         compose.onNode(hasSetTextAction()).performTextInput("Test")
-        compose.onNodeWithText("生成语音").performScrollTo().performClick()
+        compose.onNodeWithText("云端生成").performScrollTo().performClick()
         compose.runOnIdle { assertTrue(message.contains("API Key")) }
         compose.onNodeWithText("已生成", substring = true).assertDoesNotExist()
         compose.onNodeWithContentDescription("播放").assertDoesNotExist()
@@ -65,7 +65,7 @@ class RegressionTest {
     @Test fun credentialEditorRetainsRapidInputBeforeStorageEcho() {
         var saved = ""
         compose.setContent { MyApplicationTheme {
-            ProviderManagerScreen(emptyMap(), { _, _ -> }, { _, _, value -> saved = value }, {})
+            ProviderManagerScreen(emptyMap(), { _, _, value -> saved = value }, {})
         } }
         compose.onNodeWithText("阿里云 · 百炼 CosyVoice").performClick()
         val fakeKey = "sk-test-not-a-real-key-0123456789-abcdefghijklmnopqrstuvwxyz"
@@ -76,7 +76,7 @@ class RegressionTest {
     @Test fun providerSystemBackReturnsToList() {
         var leftManager = false
         compose.setContent { MyApplicationTheme {
-            ProviderManagerScreen(emptyMap(), { _, _ -> }, { _, _, _ -> }, { leftManager = true })
+            ProviderManagerScreen(emptyMap(), { _, _, _ -> }, { leftManager = true })
         } }
         compose.onNodeWithText("阿里云 · 百炼 CosyVoice").performClick()
         compose.onNodeWithText("密钥配置").assertExists()

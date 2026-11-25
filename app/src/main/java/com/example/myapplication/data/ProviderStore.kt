@@ -4,7 +4,6 @@ import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
-import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -22,26 +21,47 @@ import kotlinx.coroutines.flow.map
 // 应用级单例 DataStore
 private val Context.providerDataStore by preferencesDataStore(name = "provider_config")
 
+// Keep the existing preference values so upgrading preserves both selections.
+internal enum class SpeechMode(val preferenceValue: String) {
+    LOCAL("QWEN"), CLOUD("ALIYUN")
+}
+
 class ProviderRepository(private val context: Context) {
 
-    // 所有服务商的运行配置（启用状态 + 密钥字段），供 UI 实时订阅
+    private val speechModeKey = stringPreferencesKey("voice_engine")
+    internal val speechMode: Flow<SpeechMode> = context.providerDataStore.data.map { prefs ->
+        SpeechMode.entries.firstOrNull { it.preferenceValue == prefs[speechModeKey] } ?: SpeechMode.CLOUD
+    }
+
+    internal suspend fun setSpeechMode(mode: SpeechMode) {
+        context.providerDataStore.edit { it[speechModeKey] = mode.preferenceValue }
+    }
+
+    internal val backendSelections: Flow<Map<SpeechMode, String>> = context.providerDataStore.data.map { prefs ->
+        SpeechMode.entries.mapNotNull { mode ->
+            prefs[backendKey(mode)]?.let { mode to it }
+        }.toMap()
+    }
+
+    internal suspend fun setSelectedBackend(mode: SpeechMode, id: String) {
+        context.providerDataStore.edit { prefs ->
+            prefs[backendKey(mode)] = id
+        }
+    }
+
+    private fun backendKey(mode: SpeechMode) = stringPreferencesKey("backend_${mode.preferenceValue}")
+
+    // 所有服务商的密钥字段，供 UI 实时订阅
     val configs: Flow<Map<String, ProviderRuntimeConfig>> =
         context.providerDataStore.data.map { prefs ->
             serviceProviders.associate { provider ->
-                val enabled = prefs[booleanPreferencesKey("enabled_${provider.id}")] ?: false
                 val credentials = provider.credentialFields.mapNotNull { field ->
                     prefs[stringPreferencesKey("cred_${provider.id}_${field.key}")]
                         ?.let { field.key to it }
                 }.toMap()
-                provider.id to ProviderRuntimeConfig(enabled, credentials)
+                provider.id to ProviderRuntimeConfig(credentials)
             }
         }
-
-    suspend fun setEnabled(providerId: String, enabled: Boolean) {
-        context.providerDataStore.edit { prefs ->
-            prefs[booleanPreferencesKey("enabled_$providerId")] = enabled
-        }
-    }
 
     suspend fun setCredential(providerId: String, fieldKey: String, value: String) {
         context.providerDataStore.edit { prefs ->

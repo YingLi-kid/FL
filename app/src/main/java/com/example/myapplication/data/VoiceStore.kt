@@ -44,6 +44,15 @@ class VoiceRepository(context: Context, private val store: DataStore<Preferences
         }
     }
 
+    suspend fun rename(id: String, name: String) {
+        val trimmed = name.trim()
+        require(trimmed.isNotEmpty())
+        store.edit { prefs ->
+            val current = prefs[profilesKey]?.let { decode(it) } ?: emptyList()
+            prefs[profilesKey] = encode(current.map { if (it.id == id) it.copy(name = trimmed) else it })
+        }
+    }
+
     suspend fun updateStatus(id: String, status: String) {
         store.edit { prefs ->
             val current = prefs[profilesKey]?.let { decode(it) } ?: emptyList()
@@ -71,6 +80,8 @@ class VoiceRepository(context: Context, private val store: DataStore<Preferences
                     else put("speakerId", v.speakerId)
                     put("createdAt", v.createdAt)
                     put("status", v.status)
+                    put("engine", v.engine.name)
+                    put("backendId", v.backendId)
                 }
             )
         }
@@ -86,6 +97,7 @@ class VoiceRepository(context: Context, private val store: DataStore<Preferences
         val out = mutableListOf<VoiceProfile>()
         for (i in 0 until arr.length()) {
             val o = arr.optJSONObject(i) ?: continue
+            val engine = VoiceEngine.entries.firstOrNull { it.name == o.optString("engine") } ?: VoiceEngine.ALIYUN
             out.add(
                 VoiceProfile(
                     id = o.optString("id").ifEmpty { UUID.randomUUID().toString() },
@@ -96,7 +108,9 @@ class VoiceRepository(context: Context, private val store: DataStore<Preferences
                     sampleSeconds = o.optInt("sampleSeconds"),
                     speakerId = if (o.isNull("speakerId")) null else o.optString("speakerId"),
                     createdAt = o.optLong("createdAt", System.currentTimeMillis()),
-                    status = o.optString("status", "OK")
+                    status = o.optString("status", "OK"),
+                    engine = engine,
+                    backendId = o.optString("backendId").ifEmpty { defaultBackendId(engine) }
                 )
             )
         }

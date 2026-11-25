@@ -27,24 +27,44 @@ class AudioPlayer(private val context: Context) {
             file.writeBytes(audio)
             tempFile = file
 
-            val player = MediaPlayer()
-            mediaPlayer = player
-            player.apply {
-                setDataSource(file.absolutePath)
-                setOnCompletionListener { completed = true; onCompletion() }
-                setOnErrorListener { _, _, _ ->
-                    onError("音频播放失败")
-                    true
-                }
-                prepare()
-                start()
-            }
-            mediaPlayer?.duration ?: 0
+            start(file, onCompletion, onError)
         } catch (e: Exception) {
             stop()
             onError(e.message ?: "音频播放失败")
             0
         }
+    }
+
+    /** Play an existing audio file without copying or taking ownership of it. */
+    fun playFile(
+        file: File,
+        onCompletion: () -> Unit = {},
+        onError: (String) -> Unit = {}
+    ): Int {
+        stop()
+        return try {
+            start(file, onCompletion, onError)
+        } catch (e: Exception) {
+            stop()
+            onError(e.message ?: "音频播放失败")
+            0
+        }
+    }
+
+    private fun start(file: File, onCompletion: () -> Unit, onError: (String) -> Unit): Int {
+        val player = MediaPlayer()
+        mediaPlayer = player
+        player.apply {
+            setDataSource(file.absolutePath)
+            setOnCompletionListener { completed = true; onCompletion() }
+            setOnErrorListener { _, _, _ ->
+                onError("音频播放失败")
+                true
+            }
+            prepare()
+            start()
+        }
+        return player.duration
     }
 
     /** Returns the actual playing state after pausing, resuming or replaying. */

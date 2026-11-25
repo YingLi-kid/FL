@@ -14,8 +14,6 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import android.net.Uri
-import android.util.Base64
-import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -36,12 +34,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.PersonAdd
 import androidx.compose.material.icons.rounded.UploadFile
 import androidx.compose.material.icons.rounded.VerifiedUser
 import androidx.compose.material3.Icon
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -68,9 +69,12 @@ import androidx.compose.ui.window.Dialog
 import androidx.core.content.ContextCompat
 import com.example.myapplication.data.VoiceProfile
 import com.example.myapplication.data.VoiceSource
-import com.example.myapplication.data.cosyVoiceLanguageHint
 import com.example.myapplication.data.languageLabel
-import com.example.myapplication.service.AliyunVoice
+import com.example.myapplication.data.VoiceEngine
+import com.example.myapplication.service.SpeechBackend
+import com.example.myapplication.service.LocalSpeechBackend
+import com.example.myapplication.service.CosyVoiceBackend
+import com.example.myapplication.service.AudioPlayer
 import com.example.myapplication.ui.theme.MyApplicationTheme
 import com.example.myapplication.ui.theme.TechCyan
 import com.example.myapplication.ui.theme.TechPink
@@ -88,11 +92,18 @@ fun CloneScreen(
     onRemoveVoice: (String) -> Unit,
     onUseVoice: (String) -> Unit,
     onShowMessage: (String) -> Unit,
-    providerApiKey: String?
+    providerApiKey: String?,
+    backend: SpeechBackend = CosyVoiceBackend,
+    credentials: Map<String, String> = providerApiKey?.let { mapOf("apiKey" to it) }.orEmpty(),
+    onConfigureCloud: (() -> Unit)? = null,
+    onRenameVoice: ((String, String) -> Unit)? = null
 ) {
+    val local = backend is LocalSpeechBackend
+    val needsKey = !backend.credentialsReady(credentials)
     var agreed by rememberSaveable { mutableStateOf(false) }
     var name by rememberSaveable { mutableStateOf("") }
-    var selectedLanguage by rememberSaveable { mutableStateOf("zh") }
+    var referenceText by rememberSaveable { mutableStateOf("") }
+    var selectedLanguage by rememberSaveable { mutableStateOf(backend.sampleLanguages.first().code) }
 
     var sampleSource by rememberSaveable { mutableStateOf<VoiceSource?>(null) }
     var sampleSeconds by rememberSaveable { mutableIntStateOf(0) }
@@ -106,9 +117,26 @@ fun CloneScreen(
     var cloneProgress by remember { mutableFloatStateOf(0f) }
     var cloneStatusText by remember { mutableStateOf("") }
     var cloneError by rememberSaveable { mutableStateOf<String?>(null) }
+    var renameId by rememberSaveable { mutableStateOf<String?>(null) }
+    var renameText by rememberSaveable { mutableStateOf("") }
 
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+
+    val samplePlayer = remember(context) { AudioPlayer(context.applicationContext) }
+    DisposableEffect(samplePlayer) { onDispose { samplePlayer.stop() } }
+
+    fun clearSample() {
+        samplePlayer.stop()
+        samplePath?.let { File(it).delete() }
+        samplePath = null
+        sampleSource = null
+        sampleSeconds = 0
+        sampleFileName = null
+        sampleFormat = "wav"
+        referenceText = ""
+        cloneError = null
+    }
 
     // 上传音频文件选择器
     val filePicker = rememberLauncherForActivityResult(
@@ -121,7 +149,7 @@ fun CloneScreen(
                     val fileName = queryDisplayName(context, uri) ?: "voice_sample"
                     val format = formatFromFileName(fileName)
                     val (file, seconds) = withContext(Dispatchers.IO) { AudioSamples.importFile(context, uri, format) }
-                    samplePath?.let { File(it).delete() }
+                    clearSample()
                     samplePath = file.absolutePath
                     sampleSource = VoiceSource.UPLOADED
                     sampleSeconds = seconds
@@ -140,61 +168,32 @@ fun CloneScreen(
     }
 
     val sampleExists = samplePath?.let { File(it).isFile } == true
-    val canClone = agreed && name.isNotBlank() && sampleExists && !isCloning && !isLoadingSample
+    val transcriptReady = !backend.requiresReferenceText || referenceText.isNotBlank()
+    val canClone = agreed && name.isNotBlank() && sampleExists && transcriptReady && !isCloning && !isLoadingSample
 
     LaunchedEffect(isCloning) {
         if (!isCloning) return@LaunchedEffect
-        val apiKey = providerApiKey
-        if (apiKey.isNullOrBlank()) {
-            onShowMessage("请先在设置 → 服务商管理中配置 API Key 并启用阿里云")
-            isCloning = false
-            return@LaunchedEffect
-        }
         cloneError = null
-        val submittedName = name.trim()
-        val submittedLanguage = selectedLanguage
-        val submittedSource = sampleSource ?: VoiceSource.RECORDED
         try {
-            val file = requireNotNull(samplePath?.let { File(it) }) { "请重新选择声音样本" }
-            cloneStatusText = "正在上传音频并创建复刻音色…"
+            check(backend.credentialsReady(credentials)) { "请先配置所选服务商的 API Key。" }
+            val file = requireNotNull(samplePath?.let(::File)) { "请重新选择声音样本。" }
+            val profile = VoiceProfile(
+                name = name.trim(), language = selectedLanguage,
+                source = sampleSource ?: VoiceSource.RECORDED, sampleSeconds = sampleSeconds,
+                engine = backend.engine, backendId = backend.id
+            )
+            cloneStatusText = if (local) "正在保存本地音色…" else "正在上传音频并创建复刻音色…"
             cloneProgress = 0.2f
-            Log.d("CloneScreen", "Validating uploaded sample: ${file.length()} bytes")
-            val (seconds, b64) = withContext(Dispatchers.IO) {
-                (AudioSamples.durationMs(file) / 1000).toInt() to Base64.encodeToString(file.readBytes(), Base64.NO_WRAP)
-            }
-            Log.d("CloneScreen", "Sample validated; submitting clone")
-            // Once submitted, retain the returned ID even if the user navigates away.
+            // Persist a submitted voice even if navigation removes the page during the operation.
             withContext(NonCancellable) {
-                when (val response = AliyunVoice().cloneVoice(
-                    apiKey = apiKey,
-                    audioBase64 = b64,
-                    mimeType = mimeTypeForFormat(sampleFormat),
-                    prefix = "vc" + (System.currentTimeMillis() % 100000000L).toString().padStart(8, '0'),
-                    languageHint = cosyVoiceLanguageHint(submittedLanguage)
-                )) {
-                    is AliyunVoice.Result.Success -> {
-                        onAddVoice(VoiceProfile(
-                            name = submittedName,
-                            language = submittedLanguage,
-                            source = submittedSource,
-                            sampleSeconds = seconds,
-                            speakerId = response.voiceId,
-                            status = AliyunVoice.STATUS_DEPLOYING
-                        ))
-                        onShowMessage("音色已提交审核并保存，可在我的音色中查看状态")
-                        name = ""
-                        sampleSource = null
-                        sampleSeconds = 0
-                        sampleFileName = null
-                        samplePath = null
-                        file.delete()
-                        agreed = false
-                    }
-                    is AliyunVoice.Result.Failure -> {
-                        cloneError = "克隆失败：${response.message}"
-                        onShowMessage(cloneError!!)
-                    }
-                }
+                backend.createVoice(
+                    context, profile, file, mimeTypeForFormat(sampleFormat), credentials,
+                    referenceText.takeIf { backend.requiresReferenceText }?.trim(), onAddVoice
+                )
+                clearSample()
+                name = ""
+                agreed = false
+                onShowMessage(if (local) "已保存本地音色，可在文字转语音中使用。" else "音色已提交审核并保存。")
             }
         } catch (e: CancellationException) {
             throw e
@@ -229,10 +228,10 @@ fun CloneScreen(
                 }
                 Spacer(Modifier.width(14.dp))
                 Column {
-                    Text("克隆专属音色", style = gradientTitleStyle())
+                    Text(if (local) "创建本地音色" else "克隆专属音色", style = gradientTitleStyle())
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        "用一段本人语音样本，复刻出可复用的音色。",
+                        if (local) "保存参考录音，之后可在手机上离线合成。" else "用一段本人语音样本，复刻出可复用的音色。",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -286,7 +285,8 @@ fun CloneScreen(
             Spacer(Modifier.height(8.dp))
             LanguageSelector(
                 selected = selectedLanguage,
-                onSelect = { selectedLanguage = it }
+                onSelect = { selectedLanguage = it },
+                languages = backend.sampleLanguages
             )
         }
 
@@ -302,7 +302,7 @@ fun CloneScreen(
                     leadingIcon = Icons.Rounded.Mic
                 )
                 GlassOutlineButton(
-                    text = "上传音频",
+                    text = if (local) "导入音频" else "上传音频",
                     onClick = { filePicker.launch("audio/*") },
                     enabled = !isCloning && !isLoadingSample,
                     leadingIcon = Icons.Rounded.UploadFile
@@ -311,6 +311,18 @@ fun CloneScreen(
             Spacer(Modifier.height(12.dp))
             if (samplePath != null && !sampleExists) {
                 Text("样本缓存已清理，请重新录音或上传", color = TechPink)
+            }
+            if (sampleExists && !isCloning && !isLoadingSample) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    androidx.compose.material3.TextButton(onClick = {
+                        samplePath?.let { samplePlayer.playFile(File(it), onError = onShowMessage) }
+                    }) { Text("试听样本") }
+                    androidx.compose.material3.TextButton(onClick = { clearSample() }) { Text("清除本次录音") }
+                    androidx.compose.material3.TextButton(onClick = {
+                        clearSample()
+                        showRecorder = true
+                    }) { Text("重新录音") }
+                }
             }
             when (sampleSource) {
                 VoiceSource.RECORDED -> {
@@ -322,7 +334,7 @@ fun CloneScreen(
                 }
                 VoiceSource.UPLOADED -> {
                     SampleStatusRow(
-                        label = "已上传",
+                        label = if (local) "已导入" else "已上传",
                         detail = sampleFileName ?: "",
                         accent = TechCyan
                     )
@@ -335,16 +347,36 @@ fun CloneScreen(
                     )
                 }
             }
+            if (backend.requiresReferenceText && sampleExists) {
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = referenceText,
+                    onValueChange = { referenceText = it.take(1000) },
+                    label = { Text("参考录音原文") },
+                    supportingText = { Text("填写这段录音里实际说的话，稍后可以用另一种语言生成。") },
+                    enabled = !isCloning,
+                    maxLines = 4,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
         }
 
         // 克隆按钮
         NeonButton(
-            text = if (isCloning) "克隆中…" else "开始克隆音色",
-            onClick = {
-                if (providerApiKey.isNullOrBlank()) onShowMessage("请先在设置 → 服务商管理中配置 API Key 并启用阿里云")
-                else isCloning = true
+            text = when {
+                isCloning -> if (local) "正在保存…" else "克隆中…"
+                local -> "保存本地音色"
+                needsKey && onConfigureCloud != null -> "配置 API Key"
+                else -> "开始克隆音色"
             },
-            enabled = canClone,
+            onClick = {
+                when {
+                    needsKey && onConfigureCloud != null -> onConfigureCloud()
+                    needsKey -> onShowMessage("请先配置所选服务商的 API Key")
+                    else -> isCloning = true
+                }
+            },
+            enabled = canClone || (needsKey && onConfigureCloud != null && !isCloning),
             modifier = Modifier.fillMaxWidth()
         )
 
@@ -361,14 +393,15 @@ fun CloneScreen(
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Spacer(Modifier.height(10.dp))
-                LinearProgressIndicator(
+                if (local) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                else LinearProgressIndicator(
                     progress = { cloneProgress },
                     modifier = Modifier.fillMaxWidth(),
                     color = TechCyan,
                     trackColor = MaterialTheme.colorScheme.surfaceContainerHighest
                 )
                 Spacer(Modifier.height(6.dp))
-                Text(
+                if (!local) Text(
                     "${(cloneProgress * 100).toInt()}%",
                     style = MaterialTheme.typography.labelMedium,
                     color = TechCyan
@@ -385,7 +418,12 @@ fun CloneScreen(
                 voices.forEach { voice ->
                     VoiceRow(
                         voice = voice,
+                        hasLocalSample = local && backend.isVoiceUsable(context, voice),
                         onClick = { onUseVoice(voice.id) },
+                        onRename = if (onRenameVoice != null) ({
+                            renameText = voice.name
+                            renameId = voice.id
+                        }) else null,
                         onDelete = { onRemoveVoice(voice.id) }
                     )
                 }
@@ -394,14 +432,32 @@ fun CloneScreen(
         }
     }
 
+    renameId?.let { id ->
+        AlertDialog(
+            onDismissRequest = { renameId = null },
+            title = { Text("重命名音色") },
+            text = {
+                OutlinedTextField(value = renameText, onValueChange = { renameText = it }, singleLine = true,
+                    label = { Text("音色名称") })
+            },
+            confirmButton = {
+                TextButton(enabled = renameText.isNotBlank(), onClick = {
+                    onRenameVoice?.invoke(id, renameText.trim())
+                    renameId = null
+                }) { Text("保存") }
+            },
+            dismissButton = { TextButton(onClick = { renameId = null }) { Text("取消") } }
+        )
+    }
+
     // 现场录音对话框（真实 MediaRecorder）
     if (showRecorder) {
         RecorderDialog(
             onDismiss = { showRecorder = false },
             onConfirm = { file, seconds ->
+                clearSample()
                 sampleSource = VoiceSource.RECORDED
                 sampleSeconds = seconds
-                samplePath?.let { File(it).delete() }
                 sampleFileName = "recording.m4a"
                 samplePath = file.absolutePath
                 sampleFormat = "m4a"
@@ -434,14 +490,16 @@ private fun SampleStatusRow(label: String, detail: String, accent: Color) {
 @Composable
 private fun VoiceRow(
     voice: VoiceProfile,
+    hasLocalSample: Boolean,
     onClick: () -> Unit,
+    onRename: (() -> Unit)?,
     onDelete: () -> Unit
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
-            .clickable(enabled = voice.status == "OK" && !voice.speakerId.isNullOrBlank(), onClick = onClick)
+            .clickable(enabled = voice.status == "OK" && (hasLocalSample || !voice.speakerId.isNullOrBlank()), onClick = onClick)
             .padding(horizontal = 20.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -460,9 +518,10 @@ private fun VoiceRow(
             Text(
                 listOf(
                     languageLabel(voice.language),
-                    if (voice.source == VoiceSource.RECORDED) "录音" else "上传",
+                    if (voice.source == VoiceSource.RECORDED) "录音" else if (voice.engine != VoiceEngine.ALIYUN) "导入" else "上传",
                     "${voice.sampleSeconds}s",
                     when {
+                        voice.engine != VoiceEngine.ALIYUN -> if (hasLocalSample) "本地音色" else "样本缺失，请重新创建"
                         voice.speakerId.isNullOrBlank() -> "无有效音色 ID，请重新克隆"
                         voice.status == "DEPLOYING" -> "审核中（联网后自动查询）"
                         voice.status == "UNDEPLOYED" -> "审核未通过"
@@ -472,6 +531,9 @@ private fun VoiceRow(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+        }
+        onRename?.let {
+            IconButton(onClick = it) { Icon(Icons.Rounded.Edit, contentDescription = "重命名音色") }
         }
         IconButton(onClick = onDelete) {
             Icon(Icons.Rounded.Delete, contentDescription = "删除", tint = TechPink)
@@ -489,9 +551,23 @@ private fun RecorderDialog(onDismiss: () -> Unit, onConfirm: (File, Int) -> Unit
     var accepted by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var startedAt by remember { mutableStateOf(0L) }
+    var validatedSeconds by remember { mutableStateOf<Int?>(null) }
+    val preview = remember(context) { AudioPlayer(context.applicationContext) }
+
+    fun discard() {
+        preview.stop()
+        isRecording = false
+        runCatching { recorder?.release() }
+        recorder = null
+        recordFile?.delete()
+        recordFile = null
+        validatedSeconds = null
+        seconds = 0
+        error = null
+    }
 
     fun begin() {
-        recordFile?.delete()
+        discard()
         val file = File.createTempFile("rec_", ".m4a", context.cacheDir)
         recordFile = file
         val rec = MediaRecorder()
@@ -525,8 +601,9 @@ private fun RecorderDialog(onDismiss: () -> Unit, onConfirm: (File, Int) -> Unit
             recorder = null
             val file = requireNotNull(recordFile)
             val duration = AudioSamples.durationMs(file)
-            accepted = true
-            onConfirm(file, (duration / 1000).toInt())
+            validatedSeconds = (duration / 1000).toInt()
+            seconds = requireNotNull(validatedSeconds)
+            error = null
         } catch (e: Exception) {
             recorder?.release()
             recorder = null
@@ -548,6 +625,7 @@ private fun RecorderDialog(onDismiss: () -> Unit, onConfirm: (File, Int) -> Unit
     }
     DisposableEffect(Unit) {
         onDispose {
+            preview.stop()
             runCatching { recorder?.release() }
             if (!accepted) recordFile?.delete()
         }
@@ -566,13 +644,32 @@ private fun RecorderDialog(onDismiss: () -> Unit, onConfirm: (File, Int) -> Unit
             VoiceWave(active = isRecording, modifier = Modifier.height(48.dp))
             Text(formatSeconds(seconds), style = MaterialTheme.typography.titleLarge, color = TechCyan)
             Spacer(Modifier.height(20.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                GlassOutlineButton(text = if (isRecording) "停止" else "开始录音", onClick = {
-                    if (isRecording) finish()
-                    else if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) begin()
-                    else permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                })
-                NeonButton(text = "取消", onClick = onDismiss)
+            val ready = validatedSeconds
+            if (ready != null) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    TextButton(onClick = { recordFile?.let { preview.playFile(it, onError = { error = it }) } }) { Text("试听") }
+                    TextButton(onClick = { discard() }) { Text("清除录音") }
+                    TextButton(onClick = { begin() }) { Text("重新录音") }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    TextButton(onClick = onDismiss) { Text("取消") }
+                    NeonButton(text = "使用录音", onClick = {
+                        val file = recordFile ?: return@NeonButton
+                        preview.stop()
+                        accepted = true
+                        onConfirm(file, ready)
+                    })
+                }
+            } else {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    GlassOutlineButton(text = if (isRecording) "停止" else "开始录音", onClick = {
+                        if (isRecording) finish()
+                        else if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) begin()
+                        else permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                    })
+                    if (isRecording) TextButton(onClick = { begin() }) { Text("重新录音") }
+                    TextButton(onClick = onDismiss) { Text("取消") }
+                }
             }
         }
     }

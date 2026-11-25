@@ -33,8 +33,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -70,14 +68,19 @@ private fun ProviderCapability.label(): String = when (this) {
 @Composable
 fun ProviderManagerScreen(
     configs: Map<String, ProviderRuntimeConfig>,
-    onToggleEnabled: (String, Boolean) -> Unit,
     onSaveCredential: (String, String, String) -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    initialProviderId: String? = null
 ) {
-    var selectedProviderId by rememberSaveable { mutableStateOf<String?>(null) }
+    var selectedProviderId by rememberSaveable(initialProviderId) { mutableStateOf(initialProviderId) }
     val selectedProvider = serviceProviders.firstOrNull { it.id == selectedProviderId }
 
-    BackHandler(enabled = selectedProvider != null) { selectedProviderId = null }
+    fun back() {
+        if (selectedProvider == null || initialProviderId != null) onBack()
+        else selectedProviderId = null
+    }
+
+    BackHandler(enabled = selectedProvider != null) { back() }
     Scaffold(
         containerColor = Color.Transparent,
         topBar = {
@@ -91,7 +94,7 @@ fun ProviderManagerScreen(
                 navigationIcon = {
                     IconButton(
                         onClick = {
-                            if (selectedProvider == null) onBack() else selectedProviderId = null
+                            back()
                         }
                     ) {
                         Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "返回", tint = TechCyan)
@@ -117,7 +120,6 @@ fun ProviderManagerScreen(
             ProviderDetail(
                 provider = selectedProvider,
                 config = config,
-                onToggleEnabled = { onToggleEnabled(selectedProvider.id, it) },
                 onSaveCredential = { field, value -> onSaveCredential(selectedProvider.id, field, value) },
                 modifier = Modifier.padding(innerPadding)
             )
@@ -152,7 +154,7 @@ private fun ProviderList(
                 }
                 Spacer(Modifier.width(12.dp))
                 Text(
-                    "选择语音服务商并填入你自己的密钥，密钥仅保存在本机。",
+                    "为所选云服务商配置密钥，保存后可直接在主页使用。",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -161,16 +163,9 @@ private fun ProviderList(
 
         serviceProviders.forEach { provider ->
             val config = configs[provider.id]
-            val statusText = when {
-                config?.enabled == true && config.isCredentialComplete(provider) -> "已启用"
-                config?.enabled == true -> "密钥未填全"
-                else -> "未启用"
-            }
-            val statusColor = when {
-                config?.enabled == true && config.isCredentialComplete(provider) -> TechCyan
-                config?.enabled == true -> TechPink
-                else -> MaterialTheme.colorScheme.onSurfaceVariant
-            }
+            val configured = config?.isCredentialComplete(provider) == true
+            val statusText = if (configured) "已配置" else "待配置"
+            val statusColor = if (configured) TechCyan else MaterialTheme.colorScheme.onSurfaceVariant
 
             GlassCard(onClick = { onOpenProvider(provider.id) }) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -208,7 +203,6 @@ private fun ProviderList(
 private fun ProviderDetail(
     provider: ServiceProvider,
     config: ProviderRuntimeConfig,
-    onToggleEnabled: (Boolean) -> Unit,
     onSaveCredential: (String, String) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -264,31 +258,6 @@ private fun ProviderDetail(
             }
         }
 
-        // 启用开关
-        GlassCard {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("启用此服务商", style = MaterialTheme.typography.titleMedium)
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        "启用后，克隆音色与文字转语音将优先使用它",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Switch(
-                    checked = config.enabled,
-                    onCheckedChange = onToggleEnabled,
-                    colors = SwitchDefaults.colors(
-                        checkedTrackColor = TechCyan.copy(alpha = 0.6f),
-                        checkedThumbColor = TechCyan,
-                        uncheckedTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                        uncheckedThumbColor = MaterialTheme.colorScheme.outline
-                    )
-                )
-            }
-        }
-
         // 官方文档
         GlassCard(onClick = { uriHandler.openUri(provider.docsUrl) }) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -335,7 +304,6 @@ private fun ProviderManagerPreview() {
         Box(modifier = Modifier.background(Color(0xFF080D1C))) {
             ProviderManagerScreen(
                 configs = emptyMap(),
-                onToggleEnabled = { _, _ -> },
                 onSaveCredential = { _, _, _ -> },
                 onBack = {}
             )
