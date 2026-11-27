@@ -1,5 +1,8 @@
 package com.example.myapplication.ui
 
+import com.example.myapplication.R
+import com.example.myapplication.appText
+
 import java.io.File
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -45,6 +48,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -58,20 +62,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.example.myapplication.data.TtsResult
 import com.example.myapplication.data.VoiceOption
 import com.example.myapplication.data.VoiceProfile
 import com.example.myapplication.data.languageLabel
 import com.example.myapplication.service.SPEECH_TEXT_LIMIT
 import com.example.myapplication.service.speechCharacterCount
 import com.example.myapplication.service.limitSpeechText
-import com.example.myapplication.data.SpeechHistory
 import com.example.myapplication.service.SpeechBackend
 import com.example.myapplication.service.LocalSpeechBackend
 import com.example.myapplication.service.CosyVoiceBackend
 import com.example.myapplication.service.SpeechParameter
 import com.example.myapplication.service.SpeechParameters
-import kotlinx.coroutines.NonCancellable
 import com.example.myapplication.service.AudioPlayer
 import com.example.myapplication.ui.theme.MyApplicationTheme
 import com.example.myapplication.ui.theme.TechCyan
@@ -82,7 +83,7 @@ import kotlinx.coroutines.delay
  * 已配置阿里云服务商时走真实 TTS（CosyVoice 合成），未配置服务商时提示完成配置。
  */
 @Composable
-fun TtsScreen(
+internal fun TtsScreen(
     voices: List<VoiceProfile>,
     preselectedVoiceId: String?,
     onPreselectedConsumed: () -> Unit,
@@ -91,7 +92,9 @@ fun TtsScreen(
     backend: SpeechBackend = CosyVoiceBackend,
     credentials: Map<String, String> = providerApiKey?.let { mapOf("apiKey" to it) }.orEmpty(),
     onConfigureCloud: (() -> Unit)? = null,
-    onCreateVoice: () -> Unit = {}
+    onCreateVoice: () -> Unit = {},
+    generation: SpeechGeneration = rememberSpeechGeneration(),
+    isVisible: Boolean = true
 ) {
     val local = backend is LocalSpeechBackend
     val extension = backend.format.extension
@@ -104,46 +107,40 @@ fun TtsScreen(
     var volume by rememberSaveable { mutableFloatStateOf(1.0f) }
     var pitch by rememberSaveable { mutableFloatStateOf(0f) }
 
-    var isGenerating by remember { mutableStateOf(false) }
-    var generateProgress by remember { mutableFloatStateOf(0f) }
-    var currentSegment by remember { mutableIntStateOf(0) }
-    var totalSegments by remember { mutableIntStateOf(0) }
-    var audioPath by rememberSaveable { mutableStateOf<String?>(null) }
-    var resultVoiceName by rememberSaveable { mutableStateOf<String?>(null) }
-    var resultLanguage by rememberSaveable { mutableStateOf("zh") }
-    var resultText by rememberSaveable { mutableStateOf("") }
-    var resultDuration by rememberSaveable { mutableIntStateOf(0) }
-    val lastAudio = audioPath?.let(::File)?.takeIf { it.isFile }
-    val result = if (resultVoiceName != null && audioPath?.let { File(it).isFile } == true)
-        TtsResult(resultText, resultVoiceName!!, resultLanguage, resultDuration) else null
+    val generationState by generation.state.collectAsState()
+    val progress = generationState.progress
+    val isGenerating = progress != null
+    val result = generationState.results[backend.id]?.takeIf { it.audio.isFile }
+    var observedRecordId by remember { mutableStateOf(result?.id) }
 
     var isPlaying by remember { mutableStateOf(false) }
     var playMs by remember { mutableIntStateOf(0) }
-    var audioDurationMs by rememberSaveable { mutableIntStateOf(0) }
+    var audioDurationMs by remember { mutableIntStateOf(result?.durationMs ?: 0) }
+    var exportPath by rememberSaveable { mutableStateOf<String?>(null) }
 
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val audioPlayer = remember { AudioPlayer(context.applicationContext) }
-    val history = remember(context) { SpeechHistory(context.applicationContext) }
 
     // 下载：弹出系统保存框，让用户选择保存位置
     val downloadLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument(backend.format.mime)
     ) { uri ->
-        val audio = lastAudio
+        val audio = exportPath?.let(::File)
+        exportPath = null
         if (uri != null && audio != null) {
             scope.launch {
                 try {
                     withContext(Dispatchers.IO) {
-                        requireNotNull(context.contentResolver.openOutputStream(uri)) { "无法打开保存位置" }.use { sink ->
+                        requireNotNull(context.contentResolver.openOutputStream(uri)) { appText(R.string.save_location_error) }.use { sink ->
                             audio.inputStream().use { it.copyTo(sink) }
                         }
                     }
-                    onShowMessage("已保存到所选位置")
+                    onShowMessage(appText(R.string.save_location_success))
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
-                    onShowMessage("保存失败：${e.message ?: "未知错误"}")
+                    onShowMessage(appText(R.string.save_audio_error, e.message ?: appText(R.string.unknown_error)))
                 }
             }
         }
@@ -160,7 +157,7 @@ fun TtsScreen(
             VoiceOption(
                 id = v.id,
                 name = v.name,
-                description = "${languageLabel(v.language)} · ${if (local) "本地音色" else "克隆音色"}",
+                description = "${languageLabel(v.language)} · ${if (local) appText(R.string.local_voice) else appText(R.string.clone_tab)}",
                 isCloned = true,
                 speaker = v.speakerId ?: ""
             )
@@ -182,51 +179,25 @@ fun TtsScreen(
         }
     }
 
-    LaunchedEffect(isGenerating) {
-        if (!isGenerating) return@LaunchedEffect
-        try {
-            generateProgress = 0.25f
-            currentSegment = 0
-            totalSegments = 0
-            val voice = requireNotNull(currentVoice) { "请选择可用音色。" }
-            val requestText = text.trim()
-            val requestLanguage = selectedLanguage
-            val temporary = backend.synthesize(
-                context, voice, requestText, requestLanguage,
-                SpeechParameters(speed, volume, pitch), credentials
-            ) { segment, total ->
-                withContext(Dispatchers.Main.immediate) {
-                    currentSegment = segment
-                    totalSegments = total
-                }
-            }
-            val record = withContext(NonCancellable) {
-                try {
-                    history.save(temporary, requestText, voice.name, requestLanguage, backend.name, backend.format)
-                } finally {
-                    withContext(Dispatchers.IO) { temporary.delete() }
-                }
-            }
-            audioPath = record.audio.absolutePath
-            val playedDuration = audioPlayer.playFile(
-                file = record.audio,
-                onCompletion = { playMs = audioPlayer.duration(); isPlaying = false },
-                onError = onShowMessage
-            )
-            audioDurationMs = if (playedDuration > 0) playedDuration else record.durationMs
-            resultText = requestText
-            resultVoiceName = voice.name
-            resultLanguage = requestLanguage
-            resultDuration = (audioDurationMs / 1000).coerceAtLeast(1)
-            isPlaying = audioPlayer.isPlaying()
-            playMs = 0
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            onShowMessage("合成失败：${e.message ?: "未知错误"}")
-        } finally {
-            isGenerating = false
-        }
+    fun playResult(file: File, durationMs: Int) {
+        val playedDuration = audioPlayer.playFile(
+            file,
+            onCompletion = { playMs = audioPlayer.duration(); isPlaying = false },
+            onError = onShowMessage
+        )
+        audioDurationMs = if (playedDuration > 0) playedDuration else durationMs
+        isPlaying = audioPlayer.isPlaying()
+        playMs = 0
+    }
+
+    LaunchedEffect(result?.id) {
+        if (observedRecordId == result?.id) return@LaunchedEffect
+        observedRecordId = result?.id
+        audioPlayer.stop()
+        isPlaying = false
+        playMs = 0
+        audioDurationMs = result?.durationMs ?: 0
+        if (isVisible && result != null) playResult(result.audio, result.durationMs)
     }
 
     // 播放进度轮询
@@ -250,8 +221,8 @@ fun TtsScreen(
     ) {
         if (local && voiceOptions.isEmpty()) {
             GlassCard {
-                Text("还没有可用的本地音色。")
-                androidx.compose.material3.OutlinedButton(onClick = onCreateVoice) { Text("创建本地音色") }
+                Text(appText(R.string.no_local_voices))
+                androidx.compose.material3.OutlinedButton(onClick = onCreateVoice) { Text(appText(R.string.clone_local_title)) }
             }
         }
 
@@ -270,11 +241,11 @@ fun TtsScreen(
                     }
                     Spacer(Modifier.width(14.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("选择音色", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(appText(R.string.choose_voice), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(Modifier.height(2.dp))
                         Text(currentVoice?.name ?: "", style = MaterialTheme.typography.titleMedium)
                         if (currentVoice?.isCloned == true) {
-                            Text("已克隆音色", style = MaterialTheme.typography.bodySmall, color = TechCyan)
+                            Text(appText(R.string.cloned_voices), style = MaterialTheme.typography.bodySmall, color = TechCyan)
                         }
                     }
                     Icon(Icons.Rounded.ArrowDropDown, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -310,7 +281,7 @@ fun TtsScreen(
 
         // 目标语言
         GlassCard {
-            SectionTitle("目标语言", icon = Icons.Rounded.Translate)
+            SectionTitle(appText(R.string.output_language), icon = Icons.Rounded.Translate)
             Spacer(Modifier.height(12.dp))
             LanguageSelector(
                 selected = selectedLanguage,
@@ -321,7 +292,7 @@ fun TtsScreen(
 
         // 文本输入
         GlassCard {
-            SectionTitle("合成文本", icon = Icons.Rounded.RecordVoiceOver)
+            SectionTitle(appText(R.string.synthesis_text), icon = Icons.Rounded.RecordVoiceOver)
             Spacer(Modifier.height(12.dp))
             OutlinedTextField(
                 value = text,
@@ -330,7 +301,7 @@ fun TtsScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(160.dp),
-                placeholder = { Text("输入要合成语音的文字…") },
+                placeholder = { Text(appText(R.string.synthesis_text_placeholder)) },
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = TechCyan,
                     focusedLabelColor = TechCyan,
@@ -351,48 +322,53 @@ fun TtsScreen(
 
         // 参数调节
         if (backend.parameters.isNotEmpty()) GlassCard {
-            SectionTitle("发音参数", icon = Icons.Rounded.Tune)
+            SectionTitle(appText(R.string.speech_controls), icon = Icons.Rounded.Tune)
             Spacer(Modifier.height(12.dp))
-            if (SpeechParameter.RATE in backend.parameters) ParamSlider("语速", speed, 0.5f, 2.0f, "x") { speed = it }
-            if (SpeechParameter.VOLUME in backend.parameters) ParamSlider("音量", volume, 0f, 1f, "%") { volume = it }
-            if (SpeechParameter.PITCH in backend.parameters) ParamSlider("音调", pitch, -12f, 12f, "") { pitch = it }
+            if (SpeechParameter.RATE in backend.parameters) ParamSlider(appText(R.string.speech_rate), speed, 0.5f, 2.0f, "x") { speed = it }
+            if (SpeechParameter.VOLUME in backend.parameters) ParamSlider(appText(R.string.speech_volume), volume, 0f, 1f, "%") { volume = it }
+            if (SpeechParameter.PITCH in backend.parameters) ParamSlider(appText(R.string.speech_pitch), pitch, -12f, 12f, "") { pitch = it }
         }
 
         NeonButton(
             text = when {
-                isGenerating -> "生成中…"
-                local -> "离线生成"
-                needsKey && onConfigureCloud != null -> "配置 API Key"
-                else -> "云端生成"
+                progress != null -> appText(R.string.generating)
+                generationState.clearingCache -> appText(R.string.clearing_cache)
+                local -> appText(R.string.generate_offline)
+                needsKey && onConfigureCloud != null -> appText(R.string.configure_api_key)
+                else -> appText(R.string.generate_cloud)
             },
             onClick = {
                 when {
                     needsKey && onConfigureCloud != null -> onConfigureCloud()
-                    needsKey -> onShowMessage("请先配置所选服务商的 API Key")
-                    else -> isGenerating = true
+                    needsKey -> onShowMessage(appText(R.string.provider_key_prompt))
+                    currentVoice != null -> generation.start(
+                        context, backend, currentVoice, text.trim(), selectedLanguage,
+                        SpeechParameters(speed, volume, pitch), credentials
+                    )
                 }
             },
-            enabled = !isGenerating && (needsKey || (currentVoice != null && text.isNotBlank())),
+            enabled = progress == null && !generationState.clearingCache &&
+                (needsKey || (currentVoice != null && text.isNotBlank())),
             modifier = Modifier.fillMaxWidth()
         )
 
         // 生成进度
-        if (isGenerating) {
+        if (progress != null) {
             GlassCard {
                 Text(
                     when {
-                        !local -> "正在连接阿里云合成…"
-                        currentSegment == 0 -> "正在加载千问模型…"
-                        totalSegments > 1 -> "正在离线生成第 $currentSegment / $totalSegments 段"
-                        else -> "正在手机上生成…"
+                        !progress.offline -> appText(R.string.cloud_synthesis_progress, progress.backendName)
+                        progress.segment == 0 -> appText(R.string.local_synthesis_preparing, progress.backendName)
+                        progress.total > 1 -> appText(R.string.local_synthesis_segment, progress.segment, progress.total)
+                        else -> appText(R.string.local_synthesis_progress, progress.backendName)
                     },
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Spacer(Modifier.height(10.dp))
-                if (local && totalSegments <= 1) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                if (progress.total <= 1) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                 else LinearProgressIndicator(
-                    progress = { if (local) (currentSegment - 1).toFloat() / totalSegments else generateProgress },
+                    progress = { ((progress.segment - 1).toFloat() / progress.total).coerceIn(0f, 1f) },
                     modifier = Modifier.fillMaxWidth(),
                     color = TechCyan,
                     trackColor = MaterialTheme.colorScheme.surfaceContainerHighest
@@ -400,9 +376,12 @@ fun TtsScreen(
             }
         }
 
+        generationState.error?.takeIf { it.first == backend.id }?.let { (_, message) ->
+            Text(appText(R.string.synthesis_error, message), color = MaterialTheme.colorScheme.error)
+        }
+
         // 生成结果播放条
         if (result != null) {
-            val r = result!!
             GlassCard {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(
@@ -410,27 +389,21 @@ fun TtsScreen(
                             if (audioPlayer.duration() > 0) {
                                 isPlaying = audioPlayer.togglePauseResume()
                                 playMs = audioPlayer.currentPosition()
-                            } else if (lastAudio != null) {
-                                audioDurationMs = audioPlayer.playFile(
-                                    lastAudio,
-                                    onCompletion = { playMs = audioPlayer.duration(); isPlaying = false },
-                                    onError = { onShowMessage(it) }
-                                )
-                                playMs = 0
-                                isPlaying = audioPlayer.isPlaying()
+                            } else {
+                                playResult(result.audio, result.durationMs)
                             }
                         }
                     ) {
                         Icon(
                             imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                            contentDescription = if (isPlaying) "暂停" else "播放",
+                            contentDescription = if (isPlaying) appText(R.string.pause) else appText(R.string.play),
                             tint = TechCyan
                         )
                     }
                     Spacer(Modifier.width(8.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            "已生成 · ${r.voiceName} · ${languageLabel(r.language)}",
+                            appText(R.string.synthesis_complete, result.voice, languageLabel(result.language)),
                             style = MaterialTheme.typography.titleMedium
                         )
                         Spacer(Modifier.height(8.dp))
@@ -452,13 +425,11 @@ fun TtsScreen(
                     Spacer(Modifier.width(8.dp))
                     IconButton(
                         onClick = {
-                            if (lastAudio != null) {
-                                downloadLauncher.launch("FL音坊_${System.currentTimeMillis()}.$extension")
-                            }
-                        },
-                        enabled = lastAudio != null
+                            exportPath = result.audio.absolutePath
+                            downloadLauncher.launch(appText(R.string.tts_export_filename, System.currentTimeMillis(), extension))
+                        }
                     ) {
-                        Icon(Icons.Rounded.Download, contentDescription = if (local) "导出 WAV" else "下载", tint = TechCyan)
+                        Icon(Icons.Rounded.Download, contentDescription = if (local) appText(R.string.export_wav) else appText(R.string.download), tint = TechCyan)
                     }
                 }
             }
@@ -515,7 +486,7 @@ private fun TtsScreenPreview() {
         Box(modifier = Modifier.background(Color(0xFF080D1C))) {
             TtsScreen(
                 voices = listOf(
-                    VoiceProfile(name = "我的声音", language = "zh", source = com.example.myapplication.data.VoiceSource.RECORDED, sampleSeconds = 12)
+                    VoiceProfile(name = appText(R.string.sample_voice_name), language = "zh", source = com.example.myapplication.data.VoiceSource.RECORDED, sampleSeconds = 12)
                 ),
                 preselectedVoiceId = null,
                 onPreselectedConsumed = {},

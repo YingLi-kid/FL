@@ -1,5 +1,8 @@
 package com.example.myapplication.service
 
+import com.example.myapplication.R
+import com.example.myapplication.appText
+
 import android.content.Context
 import android.os.Build
 import com.qwen.tts.studio.engine.QwenEngine
@@ -23,26 +26,26 @@ internal suspend fun generateQwenSpeech(
     volume: Float = 1f,
     onProgress: suspend (segment: Int, total: Int) -> Unit = { _, _ -> }
 ): File {
-    require(supportsQwenTrial()) { "千问离线生成需要 Android 12 及以上的 ARM64 手机。" }
-    require(reference.isFile) { "找不到本地音色样本，请重新创建音色。" }
-    require(speechCharacterCount(text) <= SPEECH_TEXT_LIMIT) { "文本最多 $SPEECH_TEXT_LIMIT 字。" }
+    require(supportsQwenTrial()) { appText(R.string.qwen_android_requirement) }
+    require(reference.isFile) { appText(R.string.qwen_reference_missing) }
+    require(speechCharacterCount(text) <= SPEECH_TEXT_LIMIT) { appText(R.string.synthesis_text_limit, SPEECH_TEXT_LIMIT) }
     val parts = splitQwenText(text)
-    require(parts.isNotEmpty()) { "请输入要合成的文字。" }
-    val languageId = requireNotNull(qwenLanguageIds[language]) { "当前千问模型不支持此语言。" }
+    require(parts.isNotEmpty()) { appText(R.string.synthesis_text_required) }
+    val languageId = requireNotNull(qwenLanguageIds[language]) { appText(R.string.qwen_language_unsupported) }
     val gain = volume.coerceIn(0f, 1f)
     return VerifiedModelStore(context, model.files).withInstalledModel { modelDir ->
         val engine = try {
             QwenEngine()
         } catch (e: LinkageError) {
-            throw IOException("此安装包未包含千问离线试验运行库。", e)
+            throw IOException(appText(R.string.qwen_runtime_missing), e)
         }
         engine.use {
             it.setBackendPreference(QwenEngine.BACKEND_CPU)
             it.setCpuThreads(Runtime.getRuntime().availableProcessors().coerceIn(1, 4))
             check(it.loadModels(modelDir.absolutePath, model.talkerName)) {
-                it.getLastError() ?: "千问模型加载失败。"
+                it.getLastError() ?: appText(R.string.qwen_load_error)
             }
-            check(it.getModelCapabilities()?.supportsCloning == true) { "当前模型不支持音色克隆。" }
+            check(it.getModelCapabilities()?.supportsCloning == true) { appText(R.string.qwen_cloning_unsupported) }
             val file = File.createTempFile("qwen-result-", ".wav", context.cacheDir)
             var sampleRate = 0
             var bytes = 0
@@ -65,13 +68,13 @@ internal suspend fun generateQwenSpeech(
                         currentCoroutineContext().ensureActive()
                         val audio = result.audio
                         check(result.success && audio != null && audio.isNotEmpty() && result.sampleRate > 0) {
-                            "第 ${index + 1} 段生成失败：${result.errorMsg ?: "千问未返回语音"}"
+                            appText(R.string.qwen_segment_error, index + 1, result.errorMsg ?: appText(R.string.qwen_no_audio))
                         }
-                        check(frames < maxTokens) { "第 ${index + 1} 段达到音频上限，请缩短这一段再试。" }
+                        check(frames < maxTokens) { appText(R.string.qwen_segment_limit, index + 1) }
                         if (index == 0) {
                             sampleRate = result.sampleRate
                         } else {
-                            check(result.sampleRate == sampleRate) { "生成的音频采样率不一致。" }
+                            check(result.sampleRate == sampleRate) { appText(R.string.qwen_sample_rate_mismatch) }
                             val pause = ByteArray((sampleRate * 12 / 100) * 2)
                             output.write(pause)
                             bytes += pause.size

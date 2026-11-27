@@ -1,5 +1,8 @@
 package com.example.myapplication.ui
 
+import com.example.myapplication.R
+import com.example.myapplication.appText
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -35,9 +38,9 @@ internal fun LocalModelsScreen(initialModelId: String?, onBack: () -> Unit) {
         containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
-                title = { Text("本地模型") },
+                title = { Text(appText(R.string.local_models)) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "返回") }
+                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, appText(R.string.back)) }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
             )

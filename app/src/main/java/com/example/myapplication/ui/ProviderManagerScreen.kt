@@ -1,5 +1,8 @@
 package com.example.myapplication.ui
 
+import com.example.myapplication.R
+import com.example.myapplication.appText
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.platform.LocalUriHandler
@@ -57,8 +60,8 @@ import com.example.myapplication.ui.theme.TechCyan
 import com.example.myapplication.ui.theme.TechPink
 
 private fun ProviderCapability.label(): String = when (this) {
-    ProviderCapability.VOICE_CLONE -> "音色克隆"
-    ProviderCapability.TTS -> "文字转语音"
+    ProviderCapability.VOICE_CLONE -> appText(R.string.capability_clone)
+    ProviderCapability.TTS -> appText(R.string.tts_tab)
 }
 
 /**
@@ -87,7 +90,7 @@ fun ProviderManagerScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = if (selectedProvider == null) "服务商管理" else selectedProvider.name,
+                        text = if (selectedProvider == null) appText(R.string.manage_providers) else selectedProvider.name,
                         style = MaterialTheme.typography.titleLarge.copy(brush = TechAccentBrush)
                     )
                 },
@@ -97,7 +100,7 @@ fun ProviderManagerScreen(
                             back()
                         }
                     ) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "返回", tint = TechCyan)
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = appText(R.string.back), tint = TechCyan)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -154,7 +157,7 @@ private fun ProviderList(
                 }
                 Spacer(Modifier.width(12.dp))
                 Text(
-                    "为所选云服务商配置密钥，保存后可直接在主页使用。",
+                    appText(R.string.provider_configuration_help),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -164,7 +167,7 @@ private fun ProviderList(
         serviceProviders.forEach { provider ->
             val config = configs[provider.id]
             val configured = config?.isCredentialComplete(provider) == true
-            val statusText = if (configured) "已配置" else "待配置"
+            val statusText = if (configured) appText(R.string.configured) else appText(R.string.not_configured)
             val statusColor = if (configured) TechCyan else MaterialTheme.colorScheme.onSurfaceVariant
 
             GlassCard(onClick = { onOpenProvider(provider.id) }) {
@@ -225,7 +228,7 @@ private fun ProviderDetail(
 
         // 密钥字段
         GlassCard {
-            SectionTitle("密钥配置", icon = Icons.Rounded.Key)
+            SectionTitle(appText(R.string.credentials_settings), icon = Icons.Rounded.Key)
             Spacer(Modifier.height(12.dp))
             provider.credentialFields.forEach { field ->
                 // Keep editor state synchronous: a DataStore round trip must not drop keystrokes.
@@ -242,7 +245,7 @@ private fun ProviderDetail(
                     visualTransformation = PasswordVisualTransformation(),
                     trailingIcon = {
                         if (value.isNotBlank()) {
-                            Text(if (value == storedValue) "已保存" else "保存中…", style = MaterialTheme.typography.labelMedium, color = TechCyan)
+                            Text(if (value == storedValue) appText(R.string.saved) else appText(R.string.credential_saving), style = MaterialTheme.typography.labelMedium, color = TechCyan)
                         }
                     },
                     colors = OutlinedTextFieldDefaults.colors(
@@ -263,7 +266,7 @@ private fun ProviderDetail(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Rounded.OpenInNew, contentDescription = null, tint = TechCyan, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("查看官方文档与获取密钥指引", style = MaterialTheme.typography.bodyMedium)
+                Text(appText(R.string.provider_docs), style = MaterialTheme.typography.bodyMedium)
             }
         }
         Spacer(Modifier.height(8.dp))

@@ -2,6 +2,9 @@
 
 package com.example.myapplication.ui
 
+import com.example.myapplication.R
+import com.example.myapplication.appText
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -17,6 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -31,6 +35,7 @@ import androidx.compose.material.icons.rounded.Mail
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.Tune
+import androidx.compose.material.icons.rounded.Translate
 import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -39,6 +44,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -59,13 +65,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.LocalContext
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.example.myapplication.AppLanguage
 import com.example.myapplication.BuildConfig
+import com.example.myapplication.service.AppUpdate
+import com.example.myapplication.service.AppUpdates
+import androidx.compose.runtime.collectAsState
+import kotlinx.coroutines.CancellationException
 import com.example.myapplication.ui.theme.MyApplicationTheme
 import com.example.myapplication.ui.theme.TechCyan
 import kotlinx.coroutines.launch
@@ -74,69 +84,41 @@ private const val OFFICIAL_DOCS_URL = "https://www.fluentic.cn/config/soft/"
 private const val DEVELOPER_EMAIL = "administrator@fluentic.cn"
 
 // 各类弹窗文本
-private data class InfoDoc(val title: String, val body: String)
+private data class InfoDoc(val titleRes: Int, val bodyRes: Int)
 
-private val aboutDoc = InfoDoc(
-    title = "关于FL音坊",
-    body = "FL音坊的名字源于个人网站域名 fluentic，寓意「流利的音色处理工坊」。\n\n" +
-        "FL音坊是一款 AI 音频处理工具，提供两大核心功能：\n\n" +
-        "1. 克隆音色：用一段本人语音样本，复刻出专属音色，支持多国语言；\n" +
-        "2. 文字转语音：把文字合成为自然语音，可使用预设音色或你克隆出的音色。\n\n" +
-        "联网模式已接入阿里云百炼 CosyVoice。保存 API Key 后，在主页选择该服务商即可使用。"
-)
+private val aboutDoc = InfoDoc(R.string.about_title, R.string.about_body)
 
-private val userAgreement = InfoDoc(
-    title = "用户协议",
-    body = "欢迎使用FL音坊。使用本应用即表示你同意：\n\n" +
-        "1. 不得利用本应用从事任何违法违规活动；\n" +
-        "2. 本应用源码按 GNU GPL v3.0 授权，使用、修改和分发源码时请遵守该许可证；\n" +
-        "3. 音色克隆功能仅可用于本人声音，或已获得明确授权的他人声音；\n" +
-        "4. 应用内功能与内容可能随版本更新调整，以最新版本为准。\n\n" +
-        "继续使用即视为你已阅读并接受本协议。"
-)
+private val userAgreement = InfoDoc(R.string.terms_title, R.string.terms_body)
 
-private val privacyPolicy = InfoDoc(
-    title = "隐私政策",
-    body = "本应用高度重视你的隐私：\n\n" +
-        "1. 联网模式会将录音或合成文字发送至所选服务商。本地模式的录音、文字和语音生成留在设备上；\n" +
-        "2. 不要求注册账号，不收集姓名、手机号等个人身份信息；\n" +
-        "3. 你自行填写的服务商密钥仅保存在本机，仅用于向对应服务商发起请求；\n" +
-        "4. 麦克风权限用于录音，音频选择和导出通过系统文件选择器完成。生成的语音和台词保存在本机，可在生成记录中删除。"
-)
+private val privacyPolicy = InfoDoc(R.string.privacy_title, R.string.privacy_body)
 
-private val disclaimer = InfoDoc(
-    title = "免责声明",
-    body = "1. 音色克隆需获得声音本人授权，未授权克隆他人音色可能侵犯其声音权益，由此产生的后果由使用者自行承担；\n\n" +
-        "2. 各服务商接口、价格与可用性以对应服务商官方为准，本应用仅作为客户端壳提供接入；\n\n" +
-        "3. 因使用本应用产生的任何后果，由使用者自行承担。"
-)
-
-private val openSourceLicenses = InfoDoc(
-    title = "第三方开源许可",
-    body = "本应用使用了以下开源技术：\n\n" +
-        "· Jetpack Compose（Apache 2.0）\n" +
-        "· AndroidX（Apache 2.0）\n" +
-        "· Kotlin 协程（Apache 2.0）\n" +
-        "· Gradle（Apache 2.0）\n\n" +
-        "感谢开源社区的支持。"
-)
+private val openSourceLicenses = InfoDoc(R.string.licenses_title, R.string.licenses_body)
 
 /**
  * 设置页：服务商管理、官方使用文档、关于软件、联系开发者、检查更新、清除缓存、用户协议、隐私政策、免责声明、开源许可。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(
+internal fun SettingsScreen(
     snackbarHostState: SnackbarHostState,
     onOpenProviderManager: () -> Unit,
     onBack: () -> Unit,
-    onOpenLocalModels: (() -> Unit)? = null
+    onOpenLocalModels: (() -> Unit)? = null,
+    generation: SpeechGeneration = rememberSpeechGeneration(),
+    language: AppLanguage = AppLanguage.CHINESE,
+    onLanguageChange: ((AppLanguage) -> Unit)? = null,
+    checkForUpdate: suspend () -> AppUpdate? = { AppUpdates.check(BuildConfig.VERSION_NAME) }
 ) {
     var currentDoc by remember { mutableStateOf<InfoDoc?>(null) }
+    var showDisclaimer by remember { mutableStateOf(false) }
+    var showLanguages by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
     val clipboardManager = LocalClipboardManager.current
     val scope = rememberCoroutineScope()
+    val generationState by generation.state.collectAsState()
+    var checkingUpdate by remember { mutableStateOf(false) }
+    var availableUpdate by remember { mutableStateOf<AppUpdate?>(null) }
 
     Scaffold(
         containerColor = Color.Transparent,
@@ -145,7 +127,7 @@ fun SettingsScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = "设置",
+                        text = appText(R.string.settings),
                         style = MaterialTheme.typography.titleLarge.copy(brush = TechAccentBrush)
                     )
                 },
@@ -153,7 +135,7 @@ fun SettingsScreen(
                     IconButton(onClick = onBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = "返回",
+                            contentDescription = appText(R.string.back),
                             tint = TechCyan
                         )
                     }
@@ -195,10 +177,10 @@ fun SettingsScreen(
                     }
                     Spacer(Modifier.width(16.dp))
                     Column {
-                        Text("FL音坊", style = MaterialTheme.typography.titleMedium)
+                        Text(appText(R.string.app_name), style = MaterialTheme.typography.titleMedium)
                         Spacer(Modifier.height(2.dp))
                         Text(
-                            "版本 ${BuildConfig.VERSION_NAME}",
+                            appText(R.string.app_version, BuildConfig.VERSION_NAME),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -208,8 +190,8 @@ fun SettingsScreen(
 
             onOpenLocalModels?.let { open ->
                 GlassCard(onClick = open) {
-                    Text("本地模型", style = MaterialTheme.typography.titleMedium)
-                    Text("查看模型列表、下载或导入 ZIP", style = MaterialTheme.typography.bodySmall)
+                    Text(appText(R.string.local_models), style = MaterialTheme.typography.titleMedium)
+                    Text(appText(R.string.local_models_description), style = MaterialTheme.typography.bodySmall)
                 }
             }
 
@@ -227,10 +209,10 @@ fun SettingsScreen(
                     }
                     Spacer(Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("服务商管理", style = MaterialTheme.typography.titleMedium)
+                        Text(appText(R.string.manage_providers), style = MaterialTheme.typography.titleMedium)
                         Spacer(Modifier.height(2.dp))
                         Text(
-                            "配置云服务商与 API 密钥",
+                            appText(R.string.providers_description),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -245,58 +227,86 @@ fun SettingsScreen(
 
             // 关于与支持
             GlassCard(contentPadding = PaddingValues(0.dp)) {
+                if (onLanguageChange != null) {
+                    SettingItem(Icons.Rounded.Translate, appText(R.string.app_language), supporting = language.nativeName) {
+                        showLanguages = true
+                    }
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                }
                 SettingItem(
                     icon = Icons.Rounded.Description,
-                    title = "官方使用文档",
-                    supporting = "安装、服务商配置与使用教程",
+                    title = appText(R.string.official_docs),
+                    supporting = appText(R.string.official_docs_description),
                     onClick = {
                         runCatching { uriHandler.openUri(OFFICIAL_DOCS_URL) }.onFailure {
-                            scope.launch { snackbarHostState.showSnackbar("无法打开浏览器，请访问 $OFFICIAL_DOCS_URL") }
+                            scope.launch { snackbarHostState.showSnackbar(appText(R.string.browser_open_docs, OFFICIAL_DOCS_URL)) }
                         }
                     }
                 )
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                SettingItem(Icons.Rounded.Info, "关于软件") { currentDoc = aboutDoc }
+                SettingItem(Icons.Rounded.Info, appText(R.string.about_menu)) { currentDoc = aboutDoc }
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 SettingItem(
                     icon = Icons.Rounded.Mail,
-                    title = "联系开发者",
+                    title = appText(R.string.contact_developer),
                     supporting = DEVELOPER_EMAIL,
                     onClick = {
                         clipboardManager.setText(AnnotatedString(DEVELOPER_EMAIL))
-                        scope.launch { snackbarHostState.showSnackbar("开发者邮箱已复制：$DEVELOPER_EMAIL") }
+                        scope.launch { snackbarHostState.showSnackbar(appText(R.string.contact_copied, DEVELOPER_EMAIL)) }
                     }
                 )
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                SettingItem(Icons.Rounded.Refresh, "检查更新") {
-                    scope.launch { snackbarHostState.showSnackbar("暂未接入在线更新服务，请通过原安装渠道检查更新") }
+                SettingItem(
+                    Icons.Rounded.Refresh,
+                    appText(R.string.check_updates),
+                    supporting = if (checkingUpdate) appText(R.string.update_checking) else null,
+                    enabled = !checkingUpdate
+                ) {
+                    if (!checkingUpdate) {
+                        checkingUpdate = true
+                        scope.launch {
+                            val message = try {
+                                availableUpdate = checkForUpdate()
+                                if (availableUpdate == null) appText(R.string.update_current, BuildConfig.VERSION_NAME) else null
+                            } catch (e: CancellationException) {
+                                throw e
+                            } catch (_: Exception) {
+                                appText(R.string.update_check_error)
+                            } finally {
+                                checkingUpdate = false
+                            }
+                            if (message != null) snackbarHostState.showSnackbar(message)
+                        }
+                    }
                 }
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                SettingItem(Icons.Rounded.Delete, "清除缓存") {
+                SettingItem(
+                    Icons.Rounded.Delete,
+                    appText(R.string.clear_cache),
+                    supporting = if (generationState.progress != null) appText(R.string.clear_cache_wait) else null,
+                    enabled = generationState.progress == null && !generationState.clearingCache
+                ) {
                     scope.launch {
-                        val success = withContext(Dispatchers.IO) {
-                            // Settings is shown after audio/recording pages have released their files.
-                            context.cacheDir.listFiles()?.map { it.deleteRecursively() }?.all { it } ?: true
-                        }
-                        snackbarHostState.showSnackbar(if (success) "缓存已清理" else "部分缓存未能清理，请稍后重试")
+                        val success = generation.clearCache(context) ?: return@launch
+                        snackbarHostState.showSnackbar(if (success) appText(R.string.cache_cleared) else appText(R.string.cache_clear_error))
                     }
                 }
             }
 
             // 协议与声明
             GlassCard(contentPadding = PaddingValues(0.dp)) {
-                SettingItem(Icons.Rounded.Description, "用户协议") { currentDoc = userAgreement }
+                SettingItem(Icons.Rounded.Description, appText(R.string.terms_title)) { currentDoc = userAgreement }
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                SettingItem(Icons.Rounded.Security, "隐私政策") { currentDoc = privacyPolicy }
+                SettingItem(Icons.Rounded.Security, appText(R.string.privacy_title)) { currentDoc = privacyPolicy }
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                SettingItem(Icons.Rounded.Warning, "免责声明") { currentDoc = disclaimer }
+                SettingItem(Icons.Rounded.Warning, appText(R.string.disclaimer_title)) { showDisclaimer = true }
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                SettingItem(Icons.Rounded.Code, "第三方开源许可") { currentDoc = openSourceLicenses }
+                SettingItem(Icons.Rounded.Code, appText(R.string.licenses_title)) { currentDoc = openSourceLicenses }
             }
 
             // 版权
             Text(
-                text = "© 2026 影篱 YingLi · 仅供个人学习交流",
+                text = appText(R.string.copyright_notice),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier
@@ -308,6 +318,56 @@ fun SettingsScreen(
         }
     }
 
+    if (showLanguages && onLanguageChange != null) {
+        AlertDialog(
+            onDismissRequest = { showLanguages = false },
+            title = { Text(appText(R.string.app_language)) },
+            text = {
+                Column {
+                    AppLanguage.entries.forEach { choice ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth().selectable(
+                                selected = choice == language,
+                                role = Role.RadioButton,
+                                onClick = {
+                                    showLanguages = false
+                                    onLanguageChange(choice)
+                                }
+                            ).padding(vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(selected = choice == language, onClick = null)
+                            Spacer(Modifier.width(12.dp))
+                            Text(choice.nativeName)
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showLanguages = false }) { Text(appText(R.string.cancel)) } }
+        )
+    }
+
+    availableUpdate?.let { update ->
+        AlertDialog(
+            onDismissRequest = { availableUpdate = null },
+            title = { Text(appText(R.string.update_available, update.version)) },
+            text = { Text(appText(R.string.update_description, BuildConfig.VERSION_NAME)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    availableUpdate = null
+                    runCatching { uriHandler.openUri(update.downloadUrl) }.onFailure {
+                        scope.launch { snackbarHostState.showSnackbar(appText(R.string.browser_open_release)) }
+                    }
+                }) { Text(appText(R.string.download_apk)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { availableUpdate = null }) { Text(appText(R.string.later)) }
+            }
+        )
+    }
+
+    if (showDisclaimer) DisclaimerDialog(onConfirm = { showDisclaimer = false })
+
     // 条款/说明弹窗
     currentDoc?.let { doc ->
         AlertDialog(
@@ -317,11 +377,11 @@ fun SettingsScreen(
             textContentColor = MaterialTheme.colorScheme.onSurface,
             confirmButton = {
                 TextButton(onClick = { currentDoc = null }) {
-                    Text("我知道了", color = TechCyan)
+                    Text(appText(R.string.dialog_ok), color = TechCyan)
                 }
             },
-            title = { Text(doc.title, style = gradientTitleStyle()) },
-            text = { Text(doc.body, style = MaterialTheme.typography.bodyMedium) }
+            title = { Text(appText(doc.titleRes), style = gradientTitleStyle()) },
+            text = { Text(appText(doc.bodyRes), style = MaterialTheme.typography.bodyMedium) }
         )
     }
 }
@@ -331,6 +391,7 @@ private fun SettingItem(
     icon: ImageVector,
     title: String,
     supporting: String? = null,
+    enabled: Boolean = true,
     onClick: () -> Unit
 ) {
     ListItem(
@@ -342,7 +403,7 @@ private fun SettingItem(
         trailingContent = {
             Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
         },
-        modifier = Modifier.clickable(onClick = onClick)
+        modifier = Modifier.clickable(enabled = enabled, onClick = onClick)
     )
 }
 

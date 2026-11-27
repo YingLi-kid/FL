@@ -1,5 +1,8 @@
 package com.example.myapplication.ui
 
+import com.example.myapplication.R
+import com.example.myapplication.appText
+
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -74,17 +77,17 @@ internal fun LocalModelCard(
         job = scope.launch {
             try {
                 operation()
-                if (isImport) status = "ZIP 导入完成，模型已校验。"
+                if (isImport) status = appText(R.string.model_import_success)
             } catch (e: CancellationException) {
-                status = if (isImport) "已取消导入，可重新选择 ZIP。" else "下载已暂停；已下载的部分可以续传。"
+                status = if (isImport) appText(R.string.model_import_cancelled) else appText(R.string.model_download_paused)
                 throw e
             } catch (e: Exception) {
                 status = when (e) {
-                    is java.util.zip.ZipException -> "ZIP 文件无法解压，请换用完整的模型包。"
-                    is java.net.SocketTimeoutException -> "连接超时，已保留下载进度。可以重试、换来源或导入 ZIP。"
-                    is java.net.UnknownHostException -> "无法连接下载来源。可以换来源或导入 ZIP。"
-                    is IOException -> e.localizedMessage ?: "文件操作失败，请重试。"
-                    else -> e.localizedMessage ?: "操作失败，请重试。"
+                    is java.util.zip.ZipException -> appText(R.string.model_zip_invalid)
+                    is java.net.SocketTimeoutException -> appText(R.string.model_download_timeout)
+                    is java.net.UnknownHostException -> appText(R.string.model_source_unreachable)
+                    is IOException -> e.localizedMessage ?: appText(R.string.file_operation_error)
+                    else -> e.localizedMessage ?: appText(R.string.operation_error)
                 }
             } finally {
                 downloaded = store.downloadedBytes()
@@ -99,7 +102,7 @@ internal fun LocalModelCard(
     val importZip = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) start(0, isImport = true) {
             store.importZip(
-                open = { context.contentResolver.openInputStream(uri) ?: throw IOException("无法读取 ZIP 文件。") },
+                open = { context.contentResolver.openInputStream(uri) ?: throw IOException(appText(R.string.model_zip_open_error)) },
                 progress = { bytes, stage ->
                     importStage = stage
                     progress = bytes
@@ -110,12 +113,12 @@ internal fun LocalModelCard(
 
     GlassCard {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("所选型号 · ${backend.name}", style = MaterialTheme.typography.titleMedium)
+            Text(appText(R.string.model_selected, backend.name), style = MaterialTheme.typography.titleMedium)
             Button(
                 enabled = !busy,
                 onClick = { importZip.launch(arrayOf("application/zip", "application/x-zip-compressed", "application/octet-stream")) }
-            ) { Text("导入 ZIP") }
-            Text("模型列表", style = MaterialTheme.typography.titleMedium)
+            ) { Text(appText(R.string.import_zip)) }
+            Text(appText(R.string.model_list), style = MaterialTheme.typography.titleMedium)
             models.forEach { model ->
                 FilterChip(
                     selected = model.id == backend.id,
@@ -125,7 +128,7 @@ internal fun LocalModelCard(
                     modifier = Modifier.fillMaxWidth()
                 )
             }
-            Text("约 ${(store.downloadBytes + 500_000) / 1_000_000} MB · 支持 ${backend.outputLanguages.size} 种合成语言")
+            Text(appText(R.string.model_summary, (store.downloadBytes + 500_000) / 1_000_000, backend.outputLanguages.size))
             backend.modelNotice?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
             when {
                 busy -> {
@@ -135,61 +138,61 @@ internal fun LocalModelCard(
                     )
                     if (importing) {
                         Text(when (importStage) {
-                            ModelImportStage.OPENING -> "正在打开 ZIP…"
-                            ModelImportStage.READING -> "正在导入并校验 ${progress / 1_000_000} / ${(store.downloadBytes + 500_000) / 1_000_000} MB"
-                            ModelImportStage.INSTALLING -> "校验通过，正在安装模型…"
+                            ModelImportStage.OPENING -> appText(R.string.model_zip_opening)
+                            ModelImportStage.READING -> appText(R.string.model_zip_reading, progress / 1_000_000, (store.downloadBytes + 500_000) / 1_000_000)
+                            ModelImportStage.INSTALLING -> appText(R.string.model_installing)
                         })
                         if (waitingForFile && !cancelling) {
-                            Text("文件读取较慢。若 ZIP 在网盘，请先保存到手机的「下载」目录。")
+                            Text(appText(R.string.model_zip_slow))
                         }
                     } else {
-                        Text(if (progress >= store.downloadBytes) "正在校验模型…" else "已下载 ${progress / 1_000_000} MB")
+                        Text(if (progress >= store.downloadBytes) appText(R.string.model_verifying) else appText(R.string.model_downloaded, progress / 1_000_000))
                     }
                     OutlinedButton(enabled = !cancelling, onClick = {
                         cancelling = true
                         job?.cancel()
-                    }) { Text(if (cancelling) "正在停止…" else if (importing) "取消导入" else "暂停") }
+                    }) { Text(if (cancelling) appText(R.string.stopping) else if (importing) appText(R.string.cancel_import) else appText(R.string.pause)) }
                 }
                 installed -> {
-                    Text("模型文件已校验")
-                    OutlinedButton(onClick = { start(0) { store.remove() } }) { Text("删除模型") }
+                    Text(appText(R.string.model_verified))
+                    OutlinedButton(onClick = { start(0) { store.remove() } }) { Text(appText(R.string.delete_model)) }
                 }
                 else -> {
-                    if (downloaded > 0) Text("可续传 ${downloaded / 1_000_000} MB")
+                    if (downloaded > 0) Text(appText(R.string.model_resume_size, downloaded / 1_000_000))
                     OutlinedButton(onClick = {
                         start(downloaded) { store.download(store.defaultSource) { progress = it } }
-                    }) { Text(if (downloaded > 0) "继续下载 · 国际源" else "下载模型 · 国际源") }
+                    }) { Text(if (downloaded > 0) appText(R.string.model_resume_international) else appText(R.string.model_download_international)) }
                     OutlinedButton(onClick = { customSource = !customSource }) {
-                        Text(if (customSource) "收起备用来源" else "使用备用来源")
+                        Text(if (customSource) appText(R.string.hide_mirror) else appText(R.string.use_mirror))
                     }
                     if (customSource) {
                         OutlinedTextField(
                             value = source,
                             onValueChange = { source = it },
-                            label = { Text("HTTPS 镜像目录") },
+                            label = { Text(appText(R.string.mirror_directory)) },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true
                         )
                         OutlinedButton(enabled = source.isNotBlank(), onClick = {
                             start(downloaded) { store.download(source.trim()) { progress = it } }
-                        }) { Text("从备用来源下载") }
+                        }) { Text(appText(R.string.download_from_mirror)) }
                     }
                 }
             }
             if (!busy) {
                 OutlinedButton(onClick = { showDownloadFiles = !showDownloadFiles }) {
-                    Text(if (showDownloadFiles) "收起文件下载链接" else "查看文件下载链接")
+                    Text(if (showDownloadFiles) appText(R.string.hide_file_links) else appText(R.string.show_file_links))
                 }
                 if (showDownloadFiles) {
                     Text(
-                        "在浏览器下载下列全部文件，保留原文件名，压缩成一个 ZIP 后再导入。",
+                        appText(R.string.model_package_help),
                         style = MaterialTheme.typography.bodySmall
                     )
                     store.downloadFiles.forEach { file ->
                         OutlinedButton(
                             onClick = {
                                 runCatching { uriHandler.openUri(file.url) }.onFailure {
-                                    status = "无法打开浏览器，请使用应用内下载。"
+                                    status = appText(R.string.browser_open_app_download)
                                 }
                             },
                             modifier = Modifier.fillMaxWidth()
@@ -199,7 +202,7 @@ internal fun LocalModelCard(
             }
             if (status.isNotBlank()) Text(status, style = MaterialTheme.typography.bodySmall)
             Text(
-                if (backend.isSupported()) "安装后，可在主页切换到「本地离线」。" else "此设备可验证模型导入，离线克隆需要 Android 12 及以上的 ARM64 真机。",
+                if (backend.isSupported()) appText(R.string.model_ready_help) else appText(R.string.model_import_only),
                 style = MaterialTheme.typography.bodySmall
             )
         }

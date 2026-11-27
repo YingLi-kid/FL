@@ -1,5 +1,8 @@
 package com.example.myapplication.service
 
+import com.example.myapplication.R
+import com.example.myapplication.appText
+
 import android.content.Context
 import android.media.MediaPlayer
 import java.io.File
@@ -30,7 +33,7 @@ class AudioPlayer(private val context: Context) {
             start(file, onCompletion, onError)
         } catch (e: Exception) {
             stop()
-            onError(e.message ?: "音频播放失败")
+            onError(e.message ?: appText(R.string.audio_playback_error))
             0
         }
     }
@@ -46,7 +49,7 @@ class AudioPlayer(private val context: Context) {
             start(file, onCompletion, onError)
         } catch (e: Exception) {
             stop()
-            onError(e.message ?: "音频播放失败")
+            onError(e.message ?: appText(R.string.audio_playback_error))
             0
         }
     }
@@ -58,7 +61,7 @@ class AudioPlayer(private val context: Context) {
             setDataSource(file.absolutePath)
             setOnCompletionListener { completed = true; onCompletion() }
             setOnErrorListener { _, _, _ ->
-                onError("音频播放失败")
+                onError(appText(R.string.audio_playback_error))
                 true
             }
             prepare()

@@ -1,5 +1,9 @@
 package com.example.myapplication.service
 
+import androidx.annotation.StringRes
+import com.example.myapplication.R
+import com.example.myapplication.appText
+
 import android.content.Context
 import android.os.Build
 import androidx.annotation.Keep
@@ -19,25 +23,27 @@ import java.util.UUID
 private const val weightsBase = "https://huggingface.co/audio-cpp/audio.cpp-gguf/resolve/02f5de92a82339ebb722ea6fdadc14b7bec43a7f"
 
 internal val indexTts25 = AudioCppVoiceBackend(
-    VoiceEngine.INDEX_TTS, "哔哩哔哩 · IndexTTS 2.5", "index_tts2", "IndexTTS2.5-GGUF",
+    VoiceEngine.INDEX_TTS, R.string.model_index_tts, "index_tts2", "IndexTTS2.5-GGUF",
     ModelAsset("index-tts2_5-q8_0.gguf", 3_502_960_096, "d1ab7b5c3f5ecf2bcd285753be76c7290b0a54939a76b7c39e8f886f80cf6b5c"),
-    "使用哔哩哔哩模型许可。大模型，生成速度取决于手机性能。"
+    R.string.model_index_notice
 )
 
 internal val cosyVoice3Local = AudioCppVoiceBackend(
-    VoiceEngine.COSYVOICE_LOCAL, "阿里云 · Fun‑CosyVoice 3.0", "cosyvoice3", "CosyVoice3-GGUF",
+    VoiceEngine.COSYVOICE_LOCAL, R.string.model_cosyvoice_local, "cosyvoice3", "CosyVoice3-GGUF",
     ModelAsset("cosyvoice3-q8_0.gguf", 2_257_658_336, "d13bd731ead92d6d514d5749d9b59ea1b3ae735569fa46978250caaf5c983133"),
-    "用参考录音进行跨语种克隆。大模型，生成速度取决于手机性能。"
+    R.string.model_cosyvoice_notice
 )
 
 internal class AudioCppVoiceBackend(
     override val engine: VoiceEngine,
-    override val name: String,
+    @StringRes private val nameRes: Int,
     private val family: String,
     sourceFolder: String,
     private val weights: ModelAsset,
-    override val modelNotice: String
+    @StringRes private val modelNoticeRes: Int
 ) : LocalSpeechBackend {
+    override val name: String get() = appText(nameRes)
+    override val modelNotice: String get() = appText(modelNoticeRes)
     override val id = defaultBackendId(engine)
     private val spec = ModelPackageSpec(id, "$weightsBase/$sourceFolder", listOf(weights))
     override val sampleLanguages = supportedLanguages.filter { it.code in setOf("zh", "ja", "en") }
@@ -72,13 +78,13 @@ internal class AudioCppVoiceBackend(
         context: Context, voice: VoiceOption, text: String, language: String,
         parameters: SpeechParameters, credentials: Map<String, String>, progress: suspend (Int, Int) -> Unit
     ): File = VerifiedModelStore(context, spec).withInstalledModel { modelDir ->
-        require(isSupported()) { "此模型需要 Android 12 及以上的 ARM64 手机。" }
+        require(isSupported()) { appText(R.string.model_android_requirement) }
         require(text.isNotBlank() && speechCharacterCount(text) <= SPEECH_TEXT_LIMIT && '\u0000' !in text) {
-            "请输入有效的合成文字，最多 $SPEECH_TEXT_LIMIT 字。"
+            appText(R.string.synthesis_text_invalid, SPEECH_TEXT_LIMIT)
         }
-        require(outputLanguages.any { it.code == language }) { "所选模型不支持此语言。" }
+        require(outputLanguages.any { it.code == language }) { appText(R.string.model_language_unsupported) }
         val sample = reference(context, voice.id)
-        require(sample.isFile) { "找不到参考录音，请重新创建音色。" }
+        require(sample.isFile) { appText(R.string.reference_missing) }
         val audio = File.createTempFile("$id-", ".wav", context.cacheDir)
         var runtimeSpec: File? = null
         var complete = false
@@ -95,11 +101,11 @@ internal class AudioCppVoiceBackend(
                 Runtime.getRuntime().availableProcessors().coerceIn(1, 6)
             )
             currentCoroutineContext().ensureActive()
-            if (error != null || audio.length() <= 44) throw IOException(error ?: "模型未生成语音。")
+            if (error != null || audio.length() <= 44) throw IOException(error ?: appText(R.string.model_no_audio))
             complete = true
             audio
         } catch (e: LinkageError) {
-            throw IOException("当前安装包缺少此模型的推理库。", e)
+            throw IOException(appText(R.string.model_runtime_missing), e)
         } finally {
             runtimeSpec?.delete()
             if (!complete) audio.delete()

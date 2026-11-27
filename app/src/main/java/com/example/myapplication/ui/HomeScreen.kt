@@ -1,5 +1,8 @@
 package com.example.myapplication.ui
 
+import com.example.myapplication.R
+import com.example.myapplication.appText
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.Crossfade
@@ -51,6 +54,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.example.myapplication.AppLanguage
 import com.example.myapplication.data.SpeechMode
 import com.example.myapplication.data.VoiceProfile
 import com.example.myapplication.service.SpeechBackend
@@ -75,13 +79,17 @@ private enum class Screen { HOME, SETTINGS, PROVIDERS, MODELS, HISTORY }
 // 底部两个 Tab：0 克隆音色（默认）、1 文字转语音
 private data class BottomTab(val icon: ImageVector, val description: String)
 
-private val bottomTabs = listOf(
-    BottomTab(Icons.Rounded.Mic, "克隆音色"),
-    BottomTab(Icons.Rounded.RecordVoiceOver, "文字转语音")
+private val bottomTabs get() = listOf(
+    BottomTab(Icons.Rounded.Mic, appText(R.string.clone_tab)),
+    BottomTab(Icons.Rounded.RecordVoiceOver, appText(R.string.tts_tab))
 )
 
 @Composable
-fun HomeScreen() {
+internal fun HomeScreen(
+    generation: SpeechGeneration = rememberSpeechGeneration(),
+    language: AppLanguage = AppLanguage.CHINESE,
+    onLanguageChange: ((AppLanguage) -> Unit)? = null
+) {
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val showMessage: (String) -> Unit = { msg ->
@@ -110,6 +118,7 @@ fun HomeScreen() {
 
     // 已克隆音色的持久化存储（重启不丢失，支持多次克隆累积）
     val context = LocalContext.current
+    val generationState by generation.state.collectAsState()
     val voiceRepository = remember(context) { VoiceRepository(context.applicationContext) }
     val voiceProfiles by voiceRepository.profiles.collectAsState(initial = emptyList())
 
@@ -142,7 +151,7 @@ fun HomeScreen() {
                 val status = service.refreshStatus(credentials, requireNotNull(profile.speakerId))
                 if (status == "OK" || status == "UNDEPLOYED") {
                     voiceRepository.updateStatus(id, status)
-                    showMessage(if (status == "OK") "音色「${profile.name}」已可使用" else "音色「${profile.name}」未通过审核，请更换样本")
+                    showMessage(if (status == "OK") appText(R.string.cloud_voice_ready, profile.name) else appText(R.string.cloud_voice_review_failed, profile.name))
                 }
             }
             delay(10000)
@@ -177,6 +186,8 @@ fun HomeScreen() {
             screenState.SaveableStateProvider(screenKey) {
                 when (screen) {
                     Screen.HOME -> MainScaffold(
+                        generation = generation,
+                        isHomeVisible = currentScreen == Screen.HOME,
                         snackbarHostState = snackbarHostState,
                         showMessage = showMessage,
                         credentials = credentials,
@@ -228,6 +239,9 @@ fun HomeScreen() {
                         snackbarHostState = snackbarHostState,
                         onOpenProviderManager = { openProviders(Screen.SETTINGS) },
                         onOpenLocalModels = if (localSpeechBackends.isNotEmpty()) ({ openModels(Screen.SETTINGS) }) else null,
+                        generation = generation,
+                        language = language,
+                        onLanguageChange = onLanguageChange,
                         onBack = { currentScreen = Screen.HOME }
                     )
                     Screen.PROVIDERS -> ProviderManagerScreen(
@@ -239,7 +253,7 @@ fun HomeScreen() {
                         initialProviderId = initialProviderId
                     )
                     Screen.MODELS -> LocalModelsScreen(initialModelId) { currentScreen = providerReturn }
-                    Screen.HISTORY -> SpeechHistoryScreen { currentScreen = Screen.HOME }
+                    Screen.HISTORY -> SpeechHistoryScreen(generationState.results) { currentScreen = Screen.HOME }
                 }
             }
         }
@@ -249,6 +263,8 @@ fun HomeScreen() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun MainScaffold(
+    generation: SpeechGeneration,
+    isHomeVisible: Boolean,
     snackbarHostState: SnackbarHostState,
     showMessage: (String) -> Unit,
     credentials: Map<String, String>,
@@ -283,18 +299,18 @@ private fun MainScaffold(
             TopAppBar(
                 title = {
                     Text(
-                        text = "FL音坊",
+                        text = appText(R.string.app_name),
                         style = MaterialTheme.typography.titleLarge.copy(brush = TechAccentBrush)
                     )
                 },
                 actions = {
                     IconButton(onClick = onOpenHistory) {
-                        Icon(Icons.Rounded.History, contentDescription = "生成记录")
+                        Icon(Icons.Rounded.History, contentDescription = appText(R.string.generation_history))
                     }
                     IconButton(onClick = onOpenSettings) {
                         Icon(
                             imageVector = Icons.Rounded.Settings,
-                            contentDescription = "设置",
+                            contentDescription = appText(R.string.settings),
                             tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
@@ -340,7 +356,7 @@ private fun MainScaffold(
                 SingleChoiceSegmentedButtonRow(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
                 ) {
-                    val modes = listOf(SpeechMode.LOCAL to "本地离线", SpeechMode.CLOUD to "联网")
+                    val modes = listOf(SpeechMode.LOCAL to appText(R.string.local_offline), SpeechMode.CLOUD to appText(R.string.online))
                     modes.forEachIndexed { index, (option, label) ->
                         SegmentedButton(
                             selected = mode == option,
@@ -352,9 +368,9 @@ private fun MainScaffold(
                 }
             }
             BackendSelector(
-                label = if (mode == SpeechMode.LOCAL) "本地模型" else "云服务商",
+                label = if (mode == SpeechMode.LOCAL) appText(R.string.local_models) else appText(R.string.cloud_providers),
                 backend = backend, choices = backends, onSelect = onSelectBackend,
-                manageLabel = if (mode == SpeechMode.LOCAL) "管理本地模型" else "管理云服务商",
+                manageLabel = if (mode == SpeechMode.LOCAL) appText(R.string.manage_local_models) else appText(R.string.manage_cloud_providers),
                 onManage = if (mode == SpeechMode.LOCAL) onOpenModel else onManageCloud
             )
             Crossfade(
@@ -366,14 +382,14 @@ private fun MainScaffold(
                     when {
                         mode == SpeechMode.LOCAL && (!modelInstalled || !localSupported) -> {
                             GlassCard(modifier = Modifier.padding(16.dp)) {
-                                Text(if (!localSupported) "离线生成需要 Android 12 及以上的 ARM64 手机。" else "尚未安装所选模型。")
+                                Text(if (!localSupported) appText(R.string.offline_android_requirement) else appText(R.string.selected_model_missing))
                                 OutlinedButton(onClick = onOpenModel) {
-                                    Text(if (modelInstalled) "管理模型" else "下载或导入模型")
+                                    Text(if (modelInstalled) appText(R.string.manage_model) else appText(R.string.download_or_import_model))
                                 }
                             }
                         }
                         tab == 0 && !backend.supportsClone -> {
-                            GlassCard(modifier = Modifier.padding(16.dp)) { Text("此服务商不支持创建音色。") }
+                            GlassCard(modifier = Modifier.padding(16.dp)) { Text(appText(R.string.provider_clone_unsupported)) }
                         }
                         tab == 0 -> CloneScreen(
                             voices = voices,
@@ -388,6 +404,8 @@ private fun MainScaffold(
                             onRenameVoice = onRenameVoice
                         )
                         else -> TtsScreen(
+                            generation = generation,
+                            isVisible = isHomeVisible && selectedTab == 1,
                             voices = voices,
                             preselectedVoiceId = ttsPreselectedVoiceId,
                             onPreselectedConsumed = onPreselectedConsumed,

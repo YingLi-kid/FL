@@ -1,5 +1,9 @@
 package com.example.myapplication.service
 
+import com.example.myapplication.R
+import com.example.myapplication.appText
+import com.example.myapplication.originalChineseText
+
 import android.content.Context
 import android.util.Base64
 import com.example.myapplication.BuildConfig
@@ -84,7 +88,7 @@ internal val qwenLanguageIds = linkedMapOf(
 
 internal class QwenBackend(private val model: QwenModel) : LocalSpeechBackend {
     override val id = model.files.id
-    override val name = model.name
+    override val name get() = model.name
     override val engine = VoiceEngine.QWEN
     override val outputLanguages = supportedLanguages.filter { it.code in qwenLanguageIds }
     override val sampleLanguages = outputLanguages
@@ -123,13 +127,13 @@ internal class QwenBackend(private val model: QwenModel) : LocalSpeechBackend {
 object CosyVoiceBackend : CloudSpeechBackend {
     override val provider = serviceProviders.first { it.id == "aliyun" }
     override val id = provider.id
-    override val name = "阿里云百炼 · CosyVoice"
+    override val name get() = appText(R.string.provider_aliyun_backend)
     override val engine = VoiceEngine.ALIYUN
     override val sampleLanguages = supportedLanguages.filter { it.code !in setOf("it", "pt") }
     override val outputLanguages = sampleLanguages
     override val parameters = SpeechParameter.entries.toSet()
     override val format = SpeechFormat.MP3
-    override val presets = presetVoices
+    override val presets get() = presetVoices
     override val supportsClone = ProviderCapability.VOICE_CLONE in provider.capabilities
 
     override fun credentialsReady(credentials: Map<String, String>) =
@@ -173,7 +177,7 @@ object CosyVoiceBackend : CloudSpeechBackend {
         pitch = 2.0.pow(parameters.pitch.toDouble() / 12).toFloat().coerceIn(0.5f, 2f)
     )) {
         is AliyunVoice.Result.Success -> withContext(Dispatchers.IO) {
-            check(result.audio.isNotEmpty()) { "服务商返回了空音频。" }
+            check(result.audio.isNotEmpty()) { appText(R.string.provider_empty_audio) }
             val file = File.createTempFile("result_", ".mp3", context.cacheDir)
             try {
                 file.writeBytes(result.audio)
@@ -190,7 +194,7 @@ object CosyVoiceBackend : CloudSpeechBackend {
         (AliyunVoice().getVoiceStatus(apiKey(credentials), speakerId) as? AliyunVoice.Result.Success)?.status
 
     private fun apiKey(credentials: Map<String, String>): String =
-        requireNotNull(credentials["apiKey"]?.trim()?.takeIf { it.isNotEmpty() }) { "请先配置 API Key。" }
+        requireNotNull(credentials["apiKey"]?.trim()?.takeIf { it.isNotEmpty() }) { appText(R.string.api_key_required) }
 }
 
 val localSpeechBackends: List<LocalSpeechBackend> = buildList {
@@ -202,3 +206,18 @@ val localSpeechBackends: List<LocalSpeechBackend> = buildList {
     }
 }
 val cloudSpeechBackends: List<CloudSpeechBackend> = listOf(CosyVoiceBackend)
+
+private val backendNameResources = mapOf(
+    "aliyun" to R.string.provider_aliyun_backend,
+    qwen06b.files.id to R.string.model_qwen_small,
+    qwen17b.files.id to R.string.model_qwen_large,
+    OmniVoiceBackend.id to R.string.model_omnivoice,
+    indexTts25.id to R.string.model_index_tts,
+    cosyVoice3Local.id to R.string.model_cosyvoice_local
+)
+
+internal fun speechBackendLabel(idOrLegacyName: String): String {
+    val resource = backendNameResources[idOrLegacyName]
+        ?: backendNameResources.values.firstOrNull { originalChineseText(it) == idOrLegacyName }
+    return resource?.let { appText(it) } ?: idOrLegacyName
+}

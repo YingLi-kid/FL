@@ -1,5 +1,8 @@
 package com.example.myapplication.ui
 
+import com.example.myapplication.R
+import com.example.myapplication.appText
+
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
@@ -155,11 +158,11 @@ fun CloneScreen(
                     sampleSeconds = seconds
                     sampleFileName = fileName
                     sampleFormat = format
-                    onShowMessage("已选择音频：$fileName（${seconds} 秒）")
+                    onShowMessage(appText(R.string.sample_selected, fileName, seconds))
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
-                    onShowMessage("读取音频失败：${e.message}")
+                    onShowMessage(appText(R.string.sample_read_error, e.message ?: appText(R.string.unknown_error)))
                 } finally {
                     isLoadingSample = false
                 }
@@ -175,14 +178,14 @@ fun CloneScreen(
         if (!isCloning) return@LaunchedEffect
         cloneError = null
         try {
-            check(backend.credentialsReady(credentials)) { "请先配置所选服务商的 API Key。" }
-            val file = requireNotNull(samplePath?.let(::File)) { "请重新选择声音样本。" }
+            check(backend.credentialsReady(credentials)) { appText(R.string.provider_key_required) }
+            val file = requireNotNull(samplePath?.let(::File)) { appText(R.string.sample_reselect) }
             val profile = VoiceProfile(
                 name = name.trim(), language = selectedLanguage,
                 source = sampleSource ?: VoiceSource.RECORDED, sampleSeconds = sampleSeconds,
                 engine = backend.engine, backendId = backend.id
             )
-            cloneStatusText = if (local) "正在保存本地音色…" else "正在上传音频并创建复刻音色…"
+            cloneStatusText = if (local) appText(R.string.clone_local_saving) else appText(R.string.clone_uploading)
             cloneProgress = 0.2f
             // Persist a submitted voice even if navigation removes the page during the operation.
             withContext(NonCancellable) {
@@ -193,12 +196,12 @@ fun CloneScreen(
                 clearSample()
                 name = ""
                 agreed = false
-                onShowMessage(if (local) "已保存本地音色，可在文字转语音中使用。" else "音色已提交审核并保存。")
+                onShowMessage(if (local) appText(R.string.clone_local_saved) else appText(R.string.clone_submitted))
             }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            cloneError = "克隆失败：${e.message ?: "未知错误"}"
+            cloneError = appText(R.string.clone_error, e.message ?: appText(R.string.unknown_error))
             onShowMessage(cloneError!!)
         } finally {
             isCloning = false
@@ -228,10 +231,10 @@ fun CloneScreen(
                 }
                 Spacer(Modifier.width(14.dp))
                 Column {
-                    Text(if (local) "创建本地音色" else "克隆专属音色", style = gradientTitleStyle())
+                    Text(if (local) appText(R.string.clone_local_title) else appText(R.string.clone_cloud_title), style = gradientTitleStyle())
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        if (local) "保存参考录音，之后可在手机上离线合成。" else "用一段本人语音样本，复刻出可复用的音色。",
+                        if (local) appText(R.string.clone_local_intro) else appText(R.string.clone_cloud_intro),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -241,16 +244,16 @@ fun CloneScreen(
 
         // 授权声明
         GlassCard {
-            SectionTitle("本人授权", icon = Icons.Rounded.VerifiedUser)
+            SectionTitle(appText(R.string.clone_authorization), icon = Icons.Rounded.VerifiedUser)
             Spacer(Modifier.height(10.dp))
             CheckRow(
                 checked = agreed,
                 onToggle = { agreed = !agreed },
-                title = "我确认这是本人声音，或已获得声音本人的明确授权"
+                title = appText(R.string.clone_authorization_confirm)
             )
             Spacer(Modifier.height(6.dp))
             Text(
-                "未获授权的音色克隆可能侵犯他人声音权益，请务必遵守。",
+                appText(R.string.clone_authorization_notice),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -258,14 +261,14 @@ fun CloneScreen(
 
         // 音色信息
         GlassCard {
-            SectionTitle("音色信息", icon = Icons.Rounded.GraphicEq)
+            SectionTitle(appText(R.string.voice_details), icon = Icons.Rounded.GraphicEq)
             Spacer(Modifier.height(12.dp))
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it },
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("音色名称") },
-                placeholder = { Text("例如：我的声音 / 妈妈的声音") },
+                label = { Text(appText(R.string.voice_name)) },
+                placeholder = { Text(appText(R.string.voice_name_example)) },
                 singleLine = true,
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = TechCyan,
@@ -278,7 +281,7 @@ fun CloneScreen(
             )
             Spacer(Modifier.height(14.dp))
             Text(
-                "克隆样本语言",
+                appText(R.string.sample_language),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -292,17 +295,17 @@ fun CloneScreen(
 
         // 样本采集
         GlassCard {
-            SectionTitle("声音样本", icon = Icons.Rounded.Mic)
+            SectionTitle(appText(R.string.voice_sample), icon = Icons.Rounded.Mic)
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 GlassOutlineButton(
-                    text = "现场录音",
+                    text = appText(R.string.record_sample),
                     onClick = { showRecorder = true },
                     enabled = !isCloning && !isLoadingSample,
                     leadingIcon = Icons.Rounded.Mic
                 )
                 GlassOutlineButton(
-                    text = if (local) "导入音频" else "上传音频",
+                    text = if (local) appText(R.string.import_audio) else appText(R.string.upload_audio),
                     onClick = { filePicker.launch("audio/*") },
                     enabled = !isCloning && !isLoadingSample,
                     leadingIcon = Icons.Rounded.UploadFile
@@ -310,38 +313,38 @@ fun CloneScreen(
             }
             Spacer(Modifier.height(12.dp))
             if (samplePath != null && !sampleExists) {
-                Text("样本缓存已清理，请重新录音或上传", color = TechPink)
+                Text(appText(R.string.sample_cache_missing), color = TechPink)
             }
             if (sampleExists && !isCloning && !isLoadingSample) {
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     androidx.compose.material3.TextButton(onClick = {
                         samplePath?.let { samplePlayer.playFile(File(it), onError = onShowMessage) }
-                    }) { Text("试听样本") }
-                    androidx.compose.material3.TextButton(onClick = { clearSample() }) { Text("清除本次录音") }
+                    }) { Text(appText(R.string.preview_sample)) }
+                    androidx.compose.material3.TextButton(onClick = { clearSample() }) { Text(appText(R.string.clear_current_recording)) }
                     androidx.compose.material3.TextButton(onClick = {
                         clearSample()
                         showRecorder = true
-                    }) { Text("重新录音") }
+                    }) { Text(appText(R.string.record_again)) }
                 }
             }
             when (sampleSource) {
                 VoiceSource.RECORDED -> {
                     SampleStatusRow(
-                        label = "已录音",
-                        detail = "时长 ${formatSeconds(sampleSeconds)}",
+                        label = appText(R.string.sample_recorded),
+                        detail = appText(R.string.sample_duration, formatSeconds(sampleSeconds)),
                         accent = TechCyan
                     )
                 }
                 VoiceSource.UPLOADED -> {
                     SampleStatusRow(
-                        label = if (local) "已导入" else "已上传",
+                        label = if (local) appText(R.string.sample_imported) else appText(R.string.sample_uploaded),
                         detail = sampleFileName ?: "",
                         accent = TechCyan
                     )
                 }
                 null -> {
                     Text(
-                        "尚未采集样本，请录音或上传一段 5～30 秒的清晰语音。",
+                        appText(R.string.sample_required),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -352,8 +355,8 @@ fun CloneScreen(
                 OutlinedTextField(
                     value = referenceText,
                     onValueChange = { referenceText = it.take(1000) },
-                    label = { Text("参考录音原文") },
-                    supportingText = { Text("填写这段录音里实际说的话，稍后可以用另一种语言生成。") },
+                    label = { Text(appText(R.string.reference_transcript)) },
+                    supportingText = { Text(appText(R.string.reference_transcript_help)) },
                     enabled = !isCloning,
                     maxLines = 4,
                     modifier = Modifier.fillMaxWidth()
@@ -364,15 +367,15 @@ fun CloneScreen(
         // 克隆按钮
         NeonButton(
             text = when {
-                isCloning -> if (local) "正在保存…" else "克隆中…"
-                local -> "保存本地音色"
-                needsKey && onConfigureCloud != null -> "配置 API Key"
-                else -> "开始克隆音色"
+                isCloning -> if (local) appText(R.string.saving) else appText(R.string.cloning)
+                local -> appText(R.string.clone_save_local)
+                needsKey && onConfigureCloud != null -> appText(R.string.configure_api_key)
+                else -> appText(R.string.clone_start)
             },
             onClick = {
                 when {
                     needsKey && onConfigureCloud != null -> onConfigureCloud()
-                    needsKey -> onShowMessage("请先配置所选服务商的 API Key")
+                    needsKey -> onShowMessage(appText(R.string.provider_key_prompt))
                     else -> isCloning = true
                 }
             },
@@ -388,7 +391,7 @@ fun CloneScreen(
         if (isCloning) {
             GlassCard {
                 Text(
-                    cloneStatusText.ifBlank { "正在克隆…" },
+                    cloneStatusText.ifBlank { appText(R.string.clone_working) },
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
@@ -413,7 +416,7 @@ fun CloneScreen(
         if (voices.isNotEmpty()) {
             GlassCard(contentPadding = PaddingValues(0.dp)) {
                 Column(modifier = Modifier.padding(20.dp)) {
-                    SectionTitle("我的音色（${voices.size}）", icon = Icons.Rounded.GraphicEq)
+                    SectionTitle(appText(R.string.my_voices, voices.size), icon = Icons.Rounded.GraphicEq)
                 }
                 voices.forEach { voice ->
                     VoiceRow(
@@ -435,18 +438,18 @@ fun CloneScreen(
     renameId?.let { id ->
         AlertDialog(
             onDismissRequest = { renameId = null },
-            title = { Text("重命名音色") },
+            title = { Text(appText(R.string.rename_voice)) },
             text = {
                 OutlinedTextField(value = renameText, onValueChange = { renameText = it }, singleLine = true,
-                    label = { Text("音色名称") })
+                    label = { Text(appText(R.string.voice_name)) })
             },
             confirmButton = {
                 TextButton(enabled = renameText.isNotBlank(), onClick = {
                     onRenameVoice?.invoke(id, renameText.trim())
                     renameId = null
-                }) { Text("保存") }
+                }) { Text(appText(R.string.save)) }
             },
-            dismissButton = { TextButton(onClick = { renameId = null }) { Text("取消") } }
+            dismissButton = { TextButton(onClick = { renameId = null }) { Text(appText(R.string.cancel)) } }
         )
     }
 
@@ -518,14 +521,14 @@ private fun VoiceRow(
             Text(
                 listOf(
                     languageLabel(voice.language),
-                    if (voice.source == VoiceSource.RECORDED) "录音" else if (voice.engine != VoiceEngine.ALIYUN) "导入" else "上传",
+                    if (voice.source == VoiceSource.RECORDED) appText(R.string.voice_source_recording) else if (voice.engine != VoiceEngine.ALIYUN) appText(R.string.voice_source_import) else appText(R.string.voice_source_upload),
                     "${voice.sampleSeconds}s",
                     when {
-                        voice.engine != VoiceEngine.ALIYUN -> if (hasLocalSample) "本地音色" else "样本缺失，请重新创建"
-                        voice.speakerId.isNullOrBlank() -> "无有效音色 ID，请重新克隆"
-                        voice.status == "DEPLOYING" -> "审核中（联网后自动查询）"
-                        voice.status == "UNDEPLOYED" -> "审核未通过"
-                        else -> "可使用"
+                        voice.engine != VoiceEngine.ALIYUN -> if (hasLocalSample) appText(R.string.local_voice) else appText(R.string.local_voice_missing)
+                        voice.speakerId.isNullOrBlank() -> appText(R.string.cloud_voice_id_invalid)
+                        voice.status == "DEPLOYING" -> appText(R.string.cloud_voice_pending)
+                        voice.status == "UNDEPLOYED" -> appText(R.string.cloud_voice_rejected)
+                        else -> appText(R.string.voice_ready)
                     }
                 ).joinToString(" · "),
                 style = MaterialTheme.typography.bodySmall,
@@ -533,10 +536,10 @@ private fun VoiceRow(
             )
         }
         onRename?.let {
-            IconButton(onClick = it) { Icon(Icons.Rounded.Edit, contentDescription = "重命名音色") }
+            IconButton(onClick = it) { Icon(Icons.Rounded.Edit, contentDescription = appText(R.string.rename_voice)) }
         }
         IconButton(onClick = onDelete) {
-            Icon(Icons.Rounded.Delete, contentDescription = "删除", tint = TechPink)
+            Icon(Icons.Rounded.Delete, contentDescription = appText(R.string.delete), tint = TechPink)
         }
     }
 }
@@ -589,7 +592,7 @@ private fun RecorderDialog(onDismiss: () -> Unit, onConfirm: (File, Int) -> Unit
             rec.release()
             recorder = null
             file.delete()
-            error = "无法开始录音：${e.message ?: "请检查麦克风"}"
+            error = appText(R.string.recording_start_error, e.message ?: appText(R.string.microphone_check))
         }
     }
 
@@ -608,12 +611,12 @@ private fun RecorderDialog(onDismiss: () -> Unit, onConfirm: (File, Int) -> Unit
             recorder?.release()
             recorder = null
             recordFile?.delete()
-            error = "录音不可用：${e.message ?: "请录制至少 5 秒后重试"}"
+            error = appText(R.string.recording_invalid, e.message ?: appText(R.string.recording_min_duration))
         }
     }
 
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) begin() else error = "录音权限被拒绝，请在系统设置中开启麦克风权限"
+        if (granted) begin() else error = appText(R.string.recording_permission_denied)
     }
     LaunchedEffect(isRecording) {
         while (isRecording) {
@@ -636,9 +639,9 @@ private fun RecorderDialog(onDismiss: () -> Unit, onConfirm: (File, Int) -> Unit
                 .background(MaterialTheme.colorScheme.surfaceContainerHigh).padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text("录制声音样本", style = gradientTitleStyle())
+            Text(appText(R.string.recording_title), style = gradientTitleStyle())
             Spacer(Modifier.height(6.dp))
-            Text("请用正常语速清晰朗读 5～30 秒", style = MaterialTheme.typography.bodySmall)
+            Text(appText(R.string.recording_instructions), style = MaterialTheme.typography.bodySmall)
             error?.let { Text(it, color = TechPink, style = MaterialTheme.typography.bodySmall) }
             Spacer(Modifier.height(18.dp))
             VoiceWave(active = isRecording, modifier = Modifier.height(48.dp))
@@ -647,13 +650,13 @@ private fun RecorderDialog(onDismiss: () -> Unit, onConfirm: (File, Int) -> Unit
             val ready = validatedSeconds
             if (ready != null) {
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    TextButton(onClick = { recordFile?.let { preview.playFile(it, onError = { error = it }) } }) { Text("试听") }
-                    TextButton(onClick = { discard() }) { Text("清除录音") }
-                    TextButton(onClick = { begin() }) { Text("重新录音") }
+                    TextButton(onClick = { recordFile?.let { preview.playFile(it, onError = { error = it }) } }) { Text(appText(R.string.preview_audio)) }
+                    TextButton(onClick = { discard() }) { Text(appText(R.string.clear_recording)) }
+                    TextButton(onClick = { begin() }) { Text(appText(R.string.record_again)) }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    TextButton(onClick = onDismiss) { Text("取消") }
-                    NeonButton(text = "使用录音", onClick = {
+                    TextButton(onClick = onDismiss) { Text(appText(R.string.cancel)) }
+                    NeonButton(text = appText(R.string.use_recording), onClick = {
                         val file = recordFile ?: return@NeonButton
                         preview.stop()
                         accepted = true
@@ -662,13 +665,13 @@ private fun RecorderDialog(onDismiss: () -> Unit, onConfirm: (File, Int) -> Unit
                 }
             } else {
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    GlassOutlineButton(text = if (isRecording) "停止" else "开始录音", onClick = {
+                    GlassOutlineButton(text = if (isRecording) appText(R.string.stop) else appText(R.string.start_recording), onClick = {
                         if (isRecording) finish()
                         else if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) begin()
                         else permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
                     })
-                    if (isRecording) TextButton(onClick = { begin() }) { Text("重新录音") }
-                    TextButton(onClick = onDismiss) { Text("取消") }
+                    if (isRecording) TextButton(onClick = { begin() }) { Text(appText(R.string.record_again)) }
+                    TextButton(onClick = onDismiss) { Text(appText(R.string.cancel)) }
                 }
             }
         }
@@ -716,7 +719,7 @@ private fun CloneScreenPreview() {
         Box(modifier = Modifier.background(Color(0xFF080D1C))) {
             CloneScreen(
                 voices = listOf(
-                    VoiceProfile(name = "我的声音", language = "zh", source = VoiceSource.RECORDED, sampleSeconds = 12)
+                    VoiceProfile(name = appText(R.string.sample_voice_name), language = "zh", source = VoiceSource.RECORDED, sampleSeconds = 12)
                 ),
                 onAddVoice = {},
                 onRemoveVoice = {},

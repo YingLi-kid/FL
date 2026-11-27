@@ -1,5 +1,7 @@
 package com.example.myapplication.data
 
+import com.example.myapplication.R
+
 /*
  * 内置语音服务商清单。
  * 当前仅保留已接入真实 API 的服务商（阿里云百炼 CosyVoice）。
@@ -9,13 +11,13 @@ package com.example.myapplication.data
 val serviceProviders: List<ServiceProvider> = listOf(
     ServiceProvider(
         id = "aliyun",
-        name = "阿里云 · 百炼 CosyVoice",
-        region = "国内",
+        nameRes = R.string.provider_aliyun,
+        regionRes = R.string.provider_region_china,
         capabilities = setOf(ProviderCapability.VOICE_CLONE, ProviderCapability.TTS),
         credentialFields = listOf(
-            CredentialField("apiKey", "API Key", "百炼控制台 API-KEY 获取（sk- 开头）")
+            CredentialField("apiKey", "API Key", R.string.provider_key_hint)
         ),
-        description = "声音复刻免费 + 语音合成（约 2 元/万字符）",
+        descriptionRes = R.string.provider_description,
         docsUrl = "https://bailian.console.aliyun.com"
     )
 )

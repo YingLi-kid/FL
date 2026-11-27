@@ -1,5 +1,8 @@
 package com.example.myapplication.data
 
+import androidx.annotation.StringRes
+import com.example.myapplication.appText
+
 /*
  * 服务商抽象层 · 数据模型。
  *
@@ -16,19 +19,24 @@ enum class ProviderCapability { VOICE_CLONE, TTS }
 data class CredentialField(
     val key: String,
     val label: String,
-    val placeholder: String
-)
+    @StringRes private val placeholderRes: Int
+) {
+    val placeholder: String get() = appText(placeholderRes)
+}
 
 // 服务商静态元数据
 data class ServiceProvider(
     val id: String,
-    val name: String,
-    val region: String,
+    @StringRes private val nameRes: Int,
+    @StringRes private val regionRes: Int,
     val capabilities: Set<ProviderCapability>,
     val credentialFields: List<CredentialField>,
-    val description: String,
+    @StringRes private val descriptionRes: Int,
     val docsUrl: String
 ) {
+    val name: String get() = appText(nameRes)
+    val region: String get() = appText(regionRes)
+    val description: String get() = appText(descriptionRes)
     val supportsClone: Boolean get() = ProviderCapability.VOICE_CLONE in capabilities
     val supportsTts: Boolean get() = ProviderCapability.TTS in capabilities
 }

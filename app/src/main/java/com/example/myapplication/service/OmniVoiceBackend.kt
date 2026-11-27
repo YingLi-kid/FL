@@ -1,5 +1,8 @@
 package com.example.myapplication.service
 
+import com.example.myapplication.R
+import com.example.myapplication.appText
+
 import android.content.Context
 import android.os.Build
 import androidx.annotation.Keep
@@ -27,7 +30,7 @@ internal object OmniVoiceBackend : LocalSpeechBackend {
         "83820c6316da023076af7c1d06de5e38dcd09ae9f42203675bf8b3bd9a58e330"
     )
     override val id = "omnivoice-q8"
-    override val name = "OmniVoice 0.6B"
+    override val name get() = appText(R.string.model_omnivoice)
     private val spec = ModelPackageSpec(
         id, "https://huggingface.co/Serveurperso/OmniVoice-GGUF/resolve/361609388ae572a820d085185bbbe2a2aac4b30e",
         listOf(weights, codec)
@@ -38,7 +41,7 @@ internal object OmniVoiceBackend : LocalSpeechBackend {
     override val requiresReferenceText = true
     override val parameters = setOf(SpeechParameter.VOLUME)
     override val format = SpeechFormat.WAV
-    override val modelNotice = "建议 8 GB 内存。模型权重仅用于非商业用途。"
+    override val modelNotice get() = appText(R.string.model_omnivoice_notice)
 
     override fun isSupported() = Build.VERSION.SDK_INT >= 31 && Build.SUPPORTED_ABIS.firstOrNull() == "arm64-v8a"
     override fun credentialsReady(credentials: Map<String, String>) = true
@@ -56,7 +59,7 @@ internal object OmniVoiceBackend : LocalSpeechBackend {
         credentials: Map<String, String>, referenceText: String?, persist: suspend (VoiceProfile) -> Unit
     ) = withContext(Dispatchers.IO) {
         val transcript = referenceText.orEmpty().trim()
-        require(transcript.isNotEmpty() && transcript.length <= 1000 && '\u0000' !in transcript) { "请填写参考录音原文。" }
+        require(transcript.isNotEmpty() && transcript.length <= 1000 && '\u0000' !in transcript) { appText(R.string.reference_transcript_required) }
         saveLocalReference(voiceFile(context, profile.id, "wav"), sample)
         try {
             voiceFile(context, profile.id, "txt").writeText(transcript)
@@ -71,14 +74,14 @@ internal object OmniVoiceBackend : LocalSpeechBackend {
         context: Context, voice: VoiceOption, text: String, language: String,
         parameters: SpeechParameters, credentials: Map<String, String>, progress: suspend (Int, Int) -> Unit
     ): File = VerifiedModelStore(context, spec).withInstalledModel { dir ->
-        require(isSupported()) { "OmniVoice 需要 Android 12 及以上的 ARM64 手机。" }
+        require(isSupported()) { appText(R.string.omnivoice_android_requirement) }
         require(text.isNotBlank() && speechCharacterCount(text) <= SPEECH_TEXT_LIMIT && '\u0000' !in text) {
-            "请输入有效的合成文字，最多 $SPEECH_TEXT_LIMIT 字。"
+            appText(R.string.synthesis_text_invalid, SPEECH_TEXT_LIMIT)
         }
-        require(outputLanguages.any { it.code == language }) { "当前 OmniVoice 配置不支持此语言。" }
+        require(outputLanguages.any { it.code == language }) { appText(R.string.omnivoice_language_unsupported) }
         val reference = voiceFile(context, voice.id, "wav")
         val transcript = voiceFile(context, voice.id, "txt")
-        require(reference.isFile && transcript.length() > 0) { "找不到参考录音或原文，请重新创建音色。" }
+        require(reference.isFile && transcript.length() > 0) { appText(R.string.omnivoice_reference_missing) }
         val audio = File.createTempFile("omnivoice-", ".wav", context.cacheDir)
         val coroutine = currentCoroutineContext()
         var complete = false
@@ -92,11 +95,11 @@ internal object OmniVoiceBackend : LocalSpeechBackend {
                 parameters.volume.coerceIn(0f, 1f), BooleanSupplier { !coroutine.isActive }
             )
             coroutine.ensureActive()
-            if (error != null || audio.length() <= 44) throw IOException(error ?: "OmniVoice 未生成语音。")
+            if (error != null || audio.length() <= 44) throw IOException(error ?: appText(R.string.omnivoice_no_audio))
             complete = true
             audio
         } catch (e: LinkageError) {
-            throw IOException("当前安装包未包含可用的 OmniVoice 推理库。", e)
+            throw IOException(appText(R.string.omnivoice_runtime_missing), e)
         } finally {
             if (!complete) audio.delete()
         }

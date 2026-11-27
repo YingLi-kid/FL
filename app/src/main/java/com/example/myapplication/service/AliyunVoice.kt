@@ -1,5 +1,8 @@
 package com.example.myapplication.service
 
+import com.example.myapplication.R
+import com.example.myapplication.appText
+
 import android.util.Log
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -96,7 +99,7 @@ class AliyunVoice {
                 if (voiceId.isNotEmpty()) {
                     Result.Success(voiceId = voiceId)
                 } else {
-                    Result.Failure("创建音色失败：${json.optString("message", "未返回音色 ID")}")
+                    Result.Failure(appText(R.string.provider_clone_error, json.optString("message", appText(R.string.provider_missing_voice_id))))
                 }
             } else {
                 Result.Failure(parseError(json, resp.code))
@@ -105,7 +108,7 @@ class AliyunVoice {
             throw e
         } catch (e: Exception) {
             Log.w(TAG, "clone upload failed", e)
-            Result.Failure(e.message ?: "网络错误")
+            Result.Failure(e.message ?: appText(R.string.network_error))
         }
     }
 
@@ -134,7 +137,7 @@ class AliyunVoice {
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                Result.Failure(e.message ?: "网络错误")
+                Result.Failure(e.message ?: appText(R.string.network_error))
             }
         }
 
@@ -180,10 +183,10 @@ class AliyunVoice {
                     if (audio.isNotEmpty()) {
                         Result.Success(audio = audio)
                     } else {
-                        Result.Failure("下载音频失败")
+                        Result.Failure(appText(R.string.audio_download_error))
                     }
                 } else {
-                    Result.Failure("合成失败：${json.optString("message", "未返回音频")}")
+                    Result.Failure(appText(R.string.provider_synthesis_error, json.optString("message", appText(R.string.provider_missing_audio))))
                 }
             } else {
                 Result.Failure(parseError(json, resp.code))
@@ -191,7 +194,7 @@ class AliyunVoice {
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            Result.Failure(e.message ?: "网络错误")
+            Result.Failure(e.message ?: appText(R.string.network_error))
         }
     }
 

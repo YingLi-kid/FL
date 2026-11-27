@@ -30,7 +30,7 @@ This is a public preview. An existing development Debug build may have a differe
 - **Provider configuration:** save your own key and select online mode on the home screen. The app prompts for missing credentials.
 - **Dark interface:** neon gradients and glass-style components.
 
-Only Alibaba Cloud is currently implemented. The data model leaves room for additional providers. The app interface is primarily Chinese; bilingual documentation does not imply an English app interface.
+Alibaba Cloud is the current cloud provider. In builds from the current source, open **Settings → App language** to select Simplified Chinese or English. The app remembers your choice. You can also switch languages from the first-launch disclaimer.
 
 ## Getting started
 
@@ -143,8 +143,8 @@ app/src/main/java/com/example/myapplication/
 
 - Coverage across device manufacturers, unreliable networks, background transitions, and process termination is incomplete. Restoring a form does not guarantee that a cloud task continues in every situation.
 - Pending voice status is polled while the app runs; no background scheduler is implemented. Removing a local voice entry does not delete the provider's cloud voice.
-- Full synthesis history, account synchronization, online updates, and an English interface are not implemented. The update action explains that no online update service is connected.
-- Credential encryption, backup policy, and future version management need further work. The public preview APK uses a dedicated release signing key, which maintainers must back up as described above. The current application ID is `com.example.myapplication` and its version is `1.0.1`.
+- Checking for updates requires access to GitHub. When a newer version is available, the app opens the APK download link and Android handles installation.
+- The application ID is `com.example.myapplication`. The public preview APK uses a dedicated release signing key, which maintainers must back up as described above. Credential encryption and backup policy need further work.
 - Not every combination of language, preset voice, and model has been validated. Refer to current provider documentation for pricing and capabilities.
 
 Report problems through [Issues](https://github.com/YingLi-kid/FL/issues), including device model, Android version, reproduction steps, and redacted errors. Do not attach API keys or recordings without permission.

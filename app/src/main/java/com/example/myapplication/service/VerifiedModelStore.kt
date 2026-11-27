@@ -1,5 +1,8 @@
 package com.example.myapplication.service
 
+import com.example.myapplication.R
+import com.example.myapplication.appText
+
 import android.content.Context
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
@@ -64,7 +67,7 @@ internal class VerifiedModelStore(context: Context, spec: ModelPackageSpec) : Lo
     override suspend fun download(baseUrl: String, progress: (Long) -> Unit) = transfer {
         val base = baseUrl.toHttpUrl()
         require(base.isHttps && base.username.isEmpty() && base.password.isEmpty()) {
-            "下载来源必须是 HTTPS 目录地址。"
+            appText(R.string.model_source_https_required)
         }
         val stage = root.resolve("download")
         stage.mkdirs()
@@ -83,22 +86,22 @@ internal class VerifiedModelStore(context: Context, spec: ModelPackageSpec) : Lo
                     .header("Range", "bytes=$offset-$lastByte")
                     .build()
                 http.newCall(request).execute().use { response ->
-                    val body = response.body ?: throw IOException("服务器未返回模型文件。")
+                    val body = response.body ?: throw IOException(appText(R.string.model_file_missing_response))
                     val limit = when (response.code) {
                         200 -> {
                             if (body.contentLength() >= 0 && body.contentLength() != asset.bytes) {
-                                throw IOException("下载来源返回的文件大小不匹配。")
+                                throw IOException(appText(R.string.model_source_size_mismatch))
                             }
                             offset = 0L
                             asset.bytes
                         }
                         206 -> {
                             if (response.header("Content-Range") != "bytes $offset-$lastByte/${asset.bytes}") {
-                                throw IOException("服务器返回了不正确的续传范围。")
+                                throw IOException(appText(R.string.model_resume_range_mismatch))
                             }
                             lastByte - offset + 1
                         }
-                        else -> throw IOException("模型下载失败（HTTP ${response.code}）。")
+                        else -> throw IOException(appText(R.string.model_download_http_error, response.code))
                     }
                     RandomAccessFile(target, "rw").use { out ->
                         out.setLength(offset)
@@ -106,7 +109,7 @@ internal class VerifiedModelStore(context: Context, spec: ModelPackageSpec) : Lo
                         val total = copy(body.byteStream(), limit, out::write) {
                             progress(otherBytes + offset + it)
                         }
-                        if (total != limit) throw IOException("下载中断，可以继续下载。")
+                        if (total != limit) throw IOException(appText(R.string.model_download_interrupted))
                         offset += total
                     }
                 }
@@ -136,17 +139,17 @@ internal class VerifiedModelStore(context: Context, spec: ModelPackageSpec) : Lo
                 while (true) {
                     currentCoroutineContext().ensureActive()
                     val entry = runInterruptible { zip.nextEntry } ?: break
-                    if (++entryCount > 128) throw IOException("ZIP 文件条目过多。")
+                    if (++entryCount > 128) throw IOException(appText(R.string.model_zip_too_many_entries))
                     val asset = files.firstOrNull { it.name == entry.name.substringAfterLast('/') }
                     if (entry.isDirectory || asset == null) {
                         // Bound extra entries. Never extract a path supplied by the archive.
                         copy(
                             zip, 2L * 1024 * 1024, { _, _, _ -> }, interruptible = true,
-                            overflowMessage = "ZIP 包含不属于所选型号的大文件，请检查型号和量化版本。"
+                            overflowMessage = appText(R.string.model_zip_unexpected_file)
                         )
                         continue
                     }
-                    if (!found.add(asset)) throw IOException("ZIP 中有重复的模型文件。")
+                    if (!found.add(asset)) throw IOException(appText(R.string.model_zip_duplicate_file))
                     val target = stage.resolve(asset.name)
                     val hash = MessageDigest.getInstance("SHA-256")
                     val bytes = target.outputStream().buffered().use { out ->
@@ -157,14 +160,14 @@ internal class VerifiedModelStore(context: Context, spec: ModelPackageSpec) : Lo
                             progress(completed + it, ModelImportStage.READING)
                         }
                     }
-                    if (bytes != asset.bytes) throw IOException("ZIP 中的模型大小不匹配：${asset.name}")
+                    if (bytes != asset.bytes) throw IOException(appText(R.string.model_zip_size_mismatch, asset.name))
                     verifyHash(target, asset, hash)
                     completed += bytes
                 }
             }
             if (found.size != files.size) {
                 val missing = files.filterNot { it in found }.joinToString("、") { it.name }
-                throw IOException("ZIP 缺少所选型号的文件：$missing")
+                throw IOException(appText(R.string.model_zip_missing_files, missing))
             }
             currentCoroutineContext().ensureActive()
             progress(completed, ModelImportStage.INSTALLING)
@@ -178,7 +181,7 @@ internal class VerifiedModelStore(context: Context, spec: ModelPackageSpec) : Lo
     suspend fun <T> withInstalledModel(action: suspend (File) -> T): T = withContext(Dispatchers.IO) {
         operation.withLock {
             restoreInstallation()
-            check(isInstalled()) { "请先下载或导入所选模型。" }
+            check(isInstalled()) { appText(R.string.model_install_required) }
             action(modelDir)
         }
     }
@@ -188,7 +191,7 @@ internal class VerifiedModelStore(context: Context, spec: ModelPackageSpec) : Lo
         discardStage(root.resolve("download"))
         discardStage(root.resolve("import"))
         discardStage(previousModelDir)
-        if (isInstalled()) throw IOException("未能删除模型。")
+        if (isInstalled()) throw IOException(appText(R.string.model_remove_error))
     }
 
     private suspend fun transfer(skipInstalled: Boolean = true, block: suspend () -> Unit) =
@@ -202,12 +205,12 @@ internal class VerifiedModelStore(context: Context, spec: ModelPackageSpec) : Lo
 
     private fun checkSpace(bytes: Long) {
         root.mkdirs()
-        if (root.usableSpace < bytes) throw IOException("手机可用空间不足，请释放空间后再试。")
+        if (root.usableSpace < bytes) throw IOException(appText(R.string.model_storage_insufficient))
     }
 
     private fun restoreInstallation() {
         if (!modelDir.exists() && previousModelDir.exists() && !previousModelDir.renameTo(modelDir)) {
-            throw IOException("无法恢复之前安装的模型。")
+            throw IOException(appText(R.string.model_restore_error))
         }
     }
 
@@ -215,11 +218,11 @@ internal class VerifiedModelStore(context: Context, spec: ModelPackageSpec) : Lo
         restoreInstallation()
         discardStage(previousModelDir)
         if (modelDir.exists() && !modelDir.renameTo(previousModelDir)) {
-            throw IOException("无法替换之前安装的模型。")
+            throw IOException(appText(R.string.model_replace_error))
         }
         if (!stage.renameTo(modelDir)) {
             restoreInstallation()
-            throw IOException("模型校验通过，但保存失败。")
+            throw IOException(appText(R.string.model_commit_error))
         }
         discardStage(previousModelDir)
     }
@@ -230,7 +233,7 @@ internal class VerifiedModelStore(context: Context, spec: ModelPackageSpec) : Lo
     }
 
     private suspend fun verify(file: File, asset: ModelAsset) {
-        if (file.length() != asset.bytes) throw IOException("模型文件大小不匹配：${asset.name}")
+        if (file.length() != asset.bytes) throw IOException(appText(R.string.model_file_size_mismatch, asset.name))
         val hash = MessageDigest.getInstance("SHA-256")
         file.inputStream().buffered().use { copy(it, asset.bytes, hash::update) }
         verifyHash(file, asset, hash)
@@ -240,7 +243,7 @@ internal class VerifiedModelStore(context: Context, spec: ModelPackageSpec) : Lo
         val actual = hash.digest().joinToString("") { "%02x".format(it) }
         if (actual != asset.sha256) {
             file.delete()
-            throw IOException("模型校验失败，请重新下载或换一个 ZIP。")
+            throw IOException(appText(R.string.model_verification_error))
         }
     }
 
@@ -249,7 +252,7 @@ internal class VerifiedModelStore(context: Context, spec: ModelPackageSpec) : Lo
         limit: Long,
         write: (ByteArray, Int, Int) -> Unit,
         interruptible: Boolean = false,
-        overflowMessage: String = "文件超过预期大小。",
+        overflowMessage: String = appText(R.string.file_exceeds_expected_size),
         progress: (Long) -> Unit = {}
     ): Long {
         var total = 0L

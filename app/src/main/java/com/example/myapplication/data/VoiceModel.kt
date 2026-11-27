@@ -1,5 +1,9 @@
 package com.example.myapplication.data
 
+import androidx.annotation.StringRes
+import com.example.myapplication.R
+import com.example.myapplication.appText
+
 import java.util.UUID
 
 /*
@@ -11,20 +15,22 @@ import java.util.UUID
  */
 
 // 支持的语言（克隆样本语言 + TTS 目标语言共用）
-data class LanguageOption(val code: String, val label: String)
+data class LanguageOption(val code: String, @StringRes private val labelRes: Int) {
+    val label: String get() = appText(labelRes)
+}
 
 val supportedLanguages = listOf(
-    LanguageOption("zh", "中文"),
-    LanguageOption("en", "英语"),
-    LanguageOption("ja", "日语"),
-    LanguageOption("ko", "韩语"),
-    LanguageOption("fr", "法语"),
-    LanguageOption("de", "德语"),
-    LanguageOption("es", "西班牙语"),
-    LanguageOption("ru", "俄语"),
-    LanguageOption("yue", "粤语"),
-    LanguageOption("it", "意大利语"),
-    LanguageOption("pt", "葡萄牙语")
+    LanguageOption("zh", R.string.language_chinese),
+    LanguageOption("en", R.string.language_english),
+    LanguageOption("ja", R.string.language_japanese),
+    LanguageOption("ko", R.string.language_korean),
+    LanguageOption("fr", R.string.language_french),
+    LanguageOption("de", R.string.language_german),
+    LanguageOption("es", R.string.language_spanish),
+    LanguageOption("ru", R.string.language_russian),
+    LanguageOption("yue", R.string.language_cantonese),
+    LanguageOption("it", R.string.language_italian),
+    LanguageOption("pt", R.string.language_portuguese)
 )
 
 fun languageLabel(code: String): String =
@@ -73,9 +79,9 @@ data class VoiceOption(
 )
 
 // 预设系统音色（阿里云 CosyVoice 音色）
-val presetVoices = listOf(
-    VoiceOption("preset_zh_female", "龙小淳", "中文女声 · 知性自然", false, "longxiaochun_v3"),
-    VoiceOption("preset_zh_male", "龙安洋", "中文男声 · 阳光清爽", false, "longanyang")
+val presetVoices get() = listOf(
+    VoiceOption("preset_zh_female", appText(R.string.preset_xiaochun), appText(R.string.preset_xiaochun_description), false, "longxiaochun_v3"),
+    VoiceOption("preset_zh_male", appText(R.string.preset_anyang), appText(R.string.preset_anyang_description), false, "longanyang")
 )
 
 // 一次文字转语音的生成结果

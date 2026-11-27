@@ -1,5 +1,8 @@
 package com.example.myapplication.service
 
+import com.example.myapplication.R
+import com.example.myapplication.appText
+
 import android.content.Context
 import android.media.AudioFormat
 import android.media.MediaCodec
@@ -26,12 +29,12 @@ internal suspend fun saveQwenReference(context: Context, profile: VoiceProfile, 
 
 internal suspend fun saveLocalReference(destination: File, sample: File): File {
     check(destination.parentFile?.let { it.isDirectory || it.mkdirs() } == true) {
-        "无法创建本地音色目录。"
+        appText(R.string.reference_directory_error)
     }
     val temporary = File.createTempFile("reference-", ".tmp", destination.parentFile)
     try {
         decodeReference(sample, temporary)
-        check(temporary.renameTo(destination)) { "无法保存本地音色。" }
+        check(temporary.renameTo(destination)) { appText(R.string.reference_save_error) }
         return destination
     } finally {
         temporary.delete()
@@ -45,7 +48,7 @@ private suspend fun decodeReference(source: File, destination: File) {
         extractor.setDataSource(source.absolutePath)
         val track = (0 until extractor.trackCount).firstOrNull {
             extractor.getTrackFormat(it).getString(MediaFormat.KEY_MIME)?.startsWith("audio/") == true
-        } ?: error("文件中没有可用的音轨。")
+        } ?: error(appText(R.string.reference_missing_track))
         val format = extractor.getTrackFormat(track)
         val mime = requireNotNull(format.getString(MediaFormat.KEY_MIME))
         extractor.selectTrack(track)
@@ -75,7 +78,7 @@ private suspend fun writeDecodedAudio(codec: MediaCodec, extractor: MediaExtract
         output.seek(44)
         while (!outputEnded) {
             currentCoroutineContext().ensureActive()
-            check(SystemClock.elapsedRealtime() < deadline) { "音频解码超时，请试用另一段录音。" }
+            check(SystemClock.elapsedRealtime() < deadline) { appText(R.string.reference_decode_timeout) }
             if (!inputEnded) {
                 val index = codec.dequeueInputBuffer(5_000)
                 if (index >= 0) {
@@ -95,17 +98,17 @@ private suspend fun writeDecodedAudio(codec: MediaCodec, extractor: MediaExtract
                     val format = codec.outputFormat
                     sampleRate = format.getInteger(MediaFormat.KEY_SAMPLE_RATE)
                     channels = format.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
-                    check(sampleRate in 8_000..192_000 && channels in 1..8) { "不支持此音频的声道或采样率。" }
+                    check(sampleRate in 8_000..192_000 && channels in 1..8) { appText(R.string.reference_format_unsupported) }
                     if (format.containsKey(MediaFormat.KEY_PCM_ENCODING)) {
                         check(format.getInteger(MediaFormat.KEY_PCM_ENCODING) == AudioFormat.ENCODING_PCM_16BIT) {
-                            "请使用 16 位 WAV，或导入 MP3/M4A 音频。"
+                            appText(R.string.reference_format_help)
                         }
                     }
                 }
                 index >= 0 -> {
                     try {
                         if (info.size > 0 && info.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG == 0) {
-                            check(channels > 0 && info.size % (channels * 2) == 0) { "音频解码数据不完整。" }
+                            check(channels > 0 && info.size % (channels * 2) == 0) { appText(R.string.reference_decode_incomplete) }
                             val buffer = requireNotNull(codec.getOutputBuffer(index)).duplicate().order(ByteOrder.LITTLE_ENDIAN)
                             buffer.position(info.offset)
                             val mono = ByteArray(info.size / channels)
@@ -117,7 +120,7 @@ private suspend fun writeDecodedAudio(codec: MediaCodec, extractor: MediaExtract
                                 mono[i + 1] = (value shr 8).toByte()
                             }
                             bytes += mono.size
-                            check(bytes <= sampleRate * 2 * 31) { "本地音色录音不能超过 30 秒。" }
+                            check(bytes <= sampleRate * 2 * 31) { appText(R.string.reference_too_long) }
                             output.write(mono)
                         }
                         outputEnded = info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0
@@ -127,7 +130,7 @@ private suspend fun writeDecodedAudio(codec: MediaCodec, extractor: MediaExtract
                 }
             }
         }
-        check(bytes > 0 && sampleRate > 0) { "录音没有可用的声音数据。" }
+        check(bytes > 0 && sampleRate > 0) { appText(R.string.reference_empty) }
         output.seek(0)
         output.write(pcmWavHeader(bytes, sampleRate))
     }

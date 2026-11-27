@@ -1,5 +1,8 @@
 package com.example.myapplication.data
 
+import com.example.myapplication.R
+import com.example.myapplication.appText
+
 import android.content.Context
 import android.media.MediaMetadataRetriever
 import com.example.myapplication.service.SpeechFormat
@@ -37,12 +40,12 @@ internal class SpeechHistory(context: Context) {
     ): SpeechRecord = withContext(Dispatchers.IO) {
         lock.withLock {
             val id = UUID.randomUUID().toString()
-            check(root.isDirectory || root.mkdirs()) { "无法创建生成记录目录。" }
-            check(temporaryAudio.isFile && temporaryAudio.length() > 0) { "语音文件为空或已失效。" }
+            check(root.isDirectory || root.mkdirs()) { appText(R.string.history_directory_error) }
+            check(temporaryAudio.isFile && temporaryAudio.length() > 0) { appText(R.string.history_audio_invalid) }
             val durationMs = audioDuration(temporaryAudio)
             val stage = root.resolve("pending-$id")
             val destination = root.resolve(id)
-            check(stage.mkdir()) { "无法创建临时记录目录。" }
+            check(stage.mkdir()) { appText(R.string.history_temp_directory_error) }
             try {
                 val audioName = "speech.${format.extension}"
                 val createdAt = System.currentTimeMillis()
@@ -52,7 +55,7 @@ internal class SpeechHistory(context: Context) {
                     .put("backend", backend).put("format", format.name)
                     .put("createdAt", createdAt).put("durationMs", durationMs)
                 stage.resolve("record.json").writeText(metadata.toString())
-                check(stage.renameTo(destination)) { "无法保存生成记录。" }
+                check(stage.renameTo(destination)) { appText(R.string.history_save_error) }
                 SpeechRecord(id, text, voice, language, backend, format, createdAt, durationMs, destination.resolve(audioName))
             } finally {
                 if (stage.exists()) stage.deleteRecursively()
@@ -107,7 +110,7 @@ internal class SpeechHistory(context: Context) {
         return try {
             reader.setDataSource(file.absolutePath)
             val duration = reader.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toIntOrNull()
-            require(duration != null && duration > 0) { "生成的语音无法播放。" }
+            require(duration != null && duration > 0) { appText(R.string.history_unplayable) }
             duration
         } finally {
             reader.release()

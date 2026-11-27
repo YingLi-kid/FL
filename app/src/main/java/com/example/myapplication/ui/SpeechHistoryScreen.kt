@@ -1,5 +1,9 @@
 package com.example.myapplication.ui
 
+import com.example.myapplication.R
+import com.example.myapplication.appText
+import com.example.myapplication.appLocale
+
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -40,6 +44,7 @@ import com.example.myapplication.data.SpeechRecord
 import com.example.myapplication.data.languageLabel
 import com.example.myapplication.service.AudioPlayer
 import com.example.myapplication.service.SpeechFormat
+import com.example.myapplication.service.speechBackendLabel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -49,7 +54,7 @@ import java.util.Date
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun SpeechHistoryScreen(onBack: () -> Unit) {
+internal fun SpeechHistoryScreen(latestResults: Map<String, SpeechRecord>, onBack: () -> Unit) {
     val app = LocalContext.current.applicationContext
     val scope = rememberCoroutineScope()
     val history = remember(app) { SpeechHistory(app) }
@@ -60,7 +65,7 @@ internal fun SpeechHistoryScreen(onBack: () -> Unit) {
     var exportId by rememberSaveable { mutableStateOf<String?>(null) }
     var message by remember { mutableStateOf("") }
 
-    LaunchedEffect(history) { records = history.list() }
+    LaunchedEffect(history, latestResults) { records = history.list() }
     DisposableEffect(player) { onDispose { player.stop() } }
 
     fun exportResult(uri: android.net.Uri?) {
@@ -69,17 +74,17 @@ internal fun SpeechHistoryScreen(onBack: () -> Unit) {
         if (uri == null || id == null) return
         scope.launch {
             try {
-                val selected = requireNotNull(history.find(id)) { "生成记录已删除。" }
+                val selected = requireNotNull(history.find(id)) { appText(R.string.history_record_deleted) }
                 withContext(Dispatchers.IO) {
-                    requireNotNull(app.contentResolver.openOutputStream(uri)) { "无法打开保存位置。" }.use { out ->
+                    requireNotNull(app.contentResolver.openOutputStream(uri)) { appText(R.string.export_location_error) }.use { out ->
                         selected.audio.inputStream().use { it.copyTo(out) }
                     }
                 }
-                message = "音频已导出。"
+                message = appText(R.string.audio_exported)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                message = "导出失败：${e.message.orEmpty()}"
+                message = appText(R.string.export_error, e.message.orEmpty())
             }
         }
     }
@@ -91,10 +96,10 @@ internal fun SpeechHistoryScreen(onBack: () -> Unit) {
         containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
-                title = { Text("生成记录") },
+                title = { Text(appText(R.string.generation_history)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, "返回")
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, appText(R.string.back))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
@@ -107,13 +112,14 @@ internal fun SpeechHistoryScreen(onBack: () -> Unit) {
         ) {
             if (message.isNotBlank()) item { Text(message, modifier = Modifier.padding(vertical = 8.dp)) }
             if (records.isNullOrEmpty()) item {
-                Text(if (records == null) "正在加载…" else "生成的语音会保存在这里。", modifier = Modifier.padding(8.dp))
+                Text(if (records == null) appText(R.string.loading) else appText(R.string.history_empty), modifier = Modifier.padding(8.dp))
             }
             items(records.orEmpty(), key = { it.id }) { record ->
                 GlassCard {
                     Text(record.voice, style = MaterialTheme.typography.titleMedium)
-                    val date = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(record.createdAt))
-                    Text("${record.backend} · ${languageLabel(record.language)} · ${record.durationMs / 1000} 秒 · $date",
+                    val date = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT, appLocale)
+                        .format(Date(record.createdAt))
+                    Text(appText(R.string.history_record_details, speechBackendLabel(record.backend), languageLabel(record.language), record.durationMs / 1000, date),
                         style = MaterialTheme.typography.bodySmall)
                     Column(Modifier.padding(top = 8.dp)) {
                         Text(record.text, maxLines = 3, overflow = TextOverflow.Ellipsis)
@@ -129,13 +135,13 @@ internal fun SpeechHistoryScreen(onBack: () -> Unit) {
                                             message = it
                                         }) > 0) playing = record.id
                                 }
-                            }) { Text(if (playing == record.id) "停止" else "试听") }
+                            }) { Text(if (playing == record.id) appText(R.string.stop) else appText(R.string.preview_audio)) }
                             TextButton(onClick = {
                                 exportId = record.id
-                                val name = "FL音坊_${record.createdAt}.${record.format.extension}"
+                                val name = appText(R.string.history_export_filename, record.createdAt, record.format.extension)
                                 if (record.format == SpeechFormat.WAV) exportWav.launch(name) else exportMp3.launch(name)
-                            }) { Text("导出") }
-                            TextButton(onClick = { pendingDelete = record }) { Text("删除") }
+                            }) { Text(appText(R.string.export)) }
+                            TextButton(onClick = { pendingDelete = record }) { Text(appText(R.string.delete)) }
                         }
                     }
                 }
@@ -146,8 +152,8 @@ internal fun SpeechHistoryScreen(onBack: () -> Unit) {
     pendingDelete?.let { record ->
         AlertDialog(
             onDismissRequest = { pendingDelete = null },
-            title = { Text("删除生成记录？") },
-            text = { Text("这条记录和对应的本地音频会一起删除。") },
+            title = { Text(appText(R.string.history_delete_title)) },
+            text = { Text(appText(R.string.history_delete_description)) },
             confirmButton = {
                 TextButton(onClick = {
                     pendingDelete = null
@@ -156,12 +162,12 @@ internal fun SpeechHistoryScreen(onBack: () -> Unit) {
                         playing = null
                     }
                     scope.launch {
-                        message = if (history.delete(record.id)) "记录已删除。" else "删除失败，请重试。"
+                        message = if (history.delete(record.id)) appText(R.string.history_delete_success) else appText(R.string.history_delete_error)
                         records = history.list()
                     }
-                }) { Text("删除记录") }
+                }) { Text(appText(R.string.history_delete_action)) }
             },
-            dismissButton = { TextButton(onClick = { pendingDelete = null }) { Text("取消") } }
+            dismissButton = { TextButton(onClick = { pendingDelete = null }) { Text(appText(R.string.cancel)) } }
         )
     }
 }
