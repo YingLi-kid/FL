@@ -6,6 +6,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.lifecycle.ViewModelProvider
+import com.example.myapplication.ui.AppUpdateViewModel
+import com.example.myapplication.ui.AppUpdatePrompt
 import com.example.myapplication.ui.HomeScreen
 import com.example.myapplication.ui.SpeechGenerationViewModel
 import com.example.myapplication.ui.StartupDisclaimer
@@ -21,6 +23,7 @@ class MainActivity : ComponentActivity() {
         // 内容延伸到状态栏/导航栏后方，由各组件按系统内边距自行留白
         enableEdgeToEdge()
         val generation = ViewModelProvider(this)[SpeechGenerationViewModel::class.java].generation
+        val updates = ViewModelProvider(this)[AppUpdateViewModel::class.java]
         val language = AppLanguage.read(this)
         val changeLanguage: (AppLanguage) -> Unit = { selection ->
             if (selection != language) {
@@ -33,7 +36,8 @@ class MainActivity : ComponentActivity() {
             // 固定科技黑深色主题
             MyApplicationTheme {
                 StartupDisclaimer(language, changeLanguage, onDecline = ::finish) {
-                    HomeScreen(generation, language, changeLanguage)
+                    HomeScreen(generation, language, changeLanguage, updates.checkingManually, updates::checkManually)
+                    AppUpdatePrompt(updates)
                 }
             }
         }

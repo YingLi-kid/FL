@@ -17,11 +17,14 @@ import androidx.compose.ui.test.performTextInput
 import androidx.test.platform.app.InstrumentationRegistry
 import com.example.myapplication.data.SpeechHistory
 import com.example.myapplication.data.VoiceOption
+import com.example.myapplication.service.AppUpdate
 import com.example.myapplication.service.AppUpdates
 import com.example.myapplication.service.LocalSpeechBackend
 import com.example.myapplication.service.SpeechParameters
 import com.example.myapplication.service.cosyVoice3Local
 import com.example.myapplication.service.pcmWavHeader
+import com.example.myapplication.ui.AppUpdatePrompt
+import com.example.myapplication.ui.AppUpdateViewModel
 import com.example.myapplication.ui.SettingsScreen
 import com.example.myapplication.ui.SpeechGeneration
 import com.example.myapplication.ui.TtsScreen
@@ -107,22 +110,79 @@ class FollowUpRegressionTest {
         """.trimIndent()
         assertNull(AppUpdates.selectUpdate("1.10.0", releases))
         var openedUrl: String? = null
+        var calls = 0
+        val updates = AppUpdateViewModel {
+            calls++
+            AppUpdates.selectUpdate(if (calls == 1) "1.10.0" else "1.9.0", releases)
+        }
         compose.setContent {
             CompositionLocalProvider(LocalUriHandler provides object : UriHandler {
                 override fun openUri(uri: String) { openedUrl = uri }
             }) {
                 MyApplicationTheme {
-                    SettingsScreen(remember { SnackbarHostState() }, {}, {}, checkForUpdate = {
-                        AppUpdates.selectUpdate("1.9.0", releases)
-                    })
+                    SettingsScreen(remember { SnackbarHostState() }, {}, {}, checkingUpdate = updates.checkingManually,
+                        onCheckForUpdate = updates::checkManually)
+                    AppUpdatePrompt(updates)
                 }
             }
         }
+        compose.runOnIdle { assertEquals(1, calls) }
+        compose.onNodeWithText("下载 APK").assertDoesNotExist()
         compose.onNodeWithText("检查更新").performScrollTo().performClick()
         compose.onNodeWithText("发现新版 1.10.0").assertExists()
         compose.onNodeWithText("下载 APK").performClick()
         compose.runOnIdle {
             assertEquals("https://github.com/YingLi-kid/FL/releases/download/v1.10.0/FLYinFang.apk", openedUrl)
         }
+    }
+
+    @Test fun manualCheckJoinsStartupAndDismissalSurvivesRemount() {
+        val release = CompletableDeferred<AppUpdate?>()
+        var calls = 0
+        val updates = AppUpdateViewModel {
+            calls++
+            release.await()
+        }
+        val mounted = mutableStateOf(true)
+        compose.setContent { if (mounted.value) AppUpdatePrompt(updates) }
+        compose.runOnIdle {
+            updates.checkManually()
+            assertTrue(updates.checkingManually)
+            assertEquals(1, calls)
+            release.complete(AppUpdate("2.0.0", "https://github.com/YingLi-kid/FL"))
+        }
+        compose.onNodeWithText("发现新版 2.0.0").assertExists()
+        compose.onNodeWithText("稍后").performClick()
+        compose.runOnIdle { mounted.value = false }
+        compose.runOnIdle { mounted.value = true }
+        compose.onNodeWithText("下载 APK").assertDoesNotExist()
+        compose.runOnIdle { assertEquals(1, calls) }
+    }
+
+    @Test fun newerReleasePromptsOnLaunchWithoutInteraction() {
+        val releases = """[{"tag_name":"v2.0.0","assets":[{"name":"FLYinFang.apk","state":"uploaded"}]}]"""
+        val updates = AppUpdateViewModel { AppUpdates.selectUpdate("1.9.0", releases) }
+        compose.setContent { AppUpdatePrompt(updates) }
+        compose.onNodeWithText("发现新版 2.0.0").assertExists()
+        compose.onNodeWithText("稍后").performClick()
+        compose.onNodeWithText("下载 APK").assertDoesNotExist()
+    }
+
+    @Test fun offlineStartupIsSilentAndManualRetryCanFindAnUpdate() {
+        var calls = 0
+        val updates = AppUpdateViewModel {
+            calls++
+            if (calls == 1) throw java.net.UnknownHostException()
+            AppUpdate("2.0.0", "https://github.com/YingLi-kid/FL")
+        }
+        compose.setContent { AppUpdatePrompt(updates) }
+        compose.runOnIdle {
+            assertEquals(1, calls)
+            assertNull(updates.message)
+            assertNull(updates.available)
+        }
+        compose.onNodeWithText("下载 APK").assertDoesNotExist()
+        compose.runOnIdle { updates.checkManually() }
+        compose.onNodeWithText("发现新版 2.0.0").assertExists()
     }
 }

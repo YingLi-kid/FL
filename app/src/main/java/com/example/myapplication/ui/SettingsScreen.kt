@@ -72,10 +72,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.myapplication.AppLanguage
 import com.example.myapplication.BuildConfig
-import com.example.myapplication.service.AppUpdate
-import com.example.myapplication.service.AppUpdates
 import androidx.compose.runtime.collectAsState
-import kotlinx.coroutines.CancellationException
 import com.example.myapplication.ui.theme.MyApplicationTheme
 import com.example.myapplication.ui.theme.TechCyan
 import kotlinx.coroutines.launch
@@ -107,7 +104,8 @@ internal fun SettingsScreen(
     generation: SpeechGeneration = rememberSpeechGeneration(),
     language: AppLanguage = AppLanguage.CHINESE,
     onLanguageChange: ((AppLanguage) -> Unit)? = null,
-    checkForUpdate: suspend () -> AppUpdate? = { AppUpdates.check(BuildConfig.VERSION_NAME) }
+    checkingUpdate: Boolean = false,
+    onCheckForUpdate: () -> Unit = {}
 ) {
     var currentDoc by remember { mutableStateOf<InfoDoc?>(null) }
     var showDisclaimer by remember { mutableStateOf(false) }
@@ -117,8 +115,6 @@ internal fun SettingsScreen(
     val clipboardManager = LocalClipboardManager.current
     val scope = rememberCoroutineScope()
     val generationState by generation.state.collectAsState()
-    var checkingUpdate by remember { mutableStateOf(false) }
-    var availableUpdate by remember { mutableStateOf<AppUpdate?>(null) }
 
     Scaffold(
         containerColor = Color.Transparent,
@@ -260,25 +256,9 @@ internal fun SettingsScreen(
                     Icons.Rounded.Refresh,
                     appText(R.string.check_updates),
                     supporting = if (checkingUpdate) appText(R.string.update_checking) else null,
-                    enabled = !checkingUpdate
-                ) {
-                    if (!checkingUpdate) {
-                        checkingUpdate = true
-                        scope.launch {
-                            val message = try {
-                                availableUpdate = checkForUpdate()
-                                if (availableUpdate == null) appText(R.string.update_current, BuildConfig.VERSION_NAME) else null
-                            } catch (e: CancellationException) {
-                                throw e
-                            } catch (_: Exception) {
-                                appText(R.string.update_check_error)
-                            } finally {
-                                checkingUpdate = false
-                            }
-                            if (message != null) snackbarHostState.showSnackbar(message)
-                        }
-                    }
-                }
+                    enabled = !checkingUpdate,
+                    onClick = onCheckForUpdate
+                )
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 SettingItem(
                     Icons.Rounded.Delete,
@@ -344,25 +324,6 @@ internal fun SettingsScreen(
                 }
             },
             confirmButton = { TextButton(onClick = { showLanguages = false }) { Text(appText(R.string.cancel)) } }
-        )
-    }
-
-    availableUpdate?.let { update ->
-        AlertDialog(
-            onDismissRequest = { availableUpdate = null },
-            title = { Text(appText(R.string.update_available, update.version)) },
-            text = { Text(appText(R.string.update_description, BuildConfig.VERSION_NAME)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    availableUpdate = null
-                    runCatching { uriHandler.openUri(update.downloadUrl) }.onFailure {
-                        scope.launch { snackbarHostState.showSnackbar(appText(R.string.browser_open_release)) }
-                    }
-                }) { Text(appText(R.string.download_apk)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { availableUpdate = null }) { Text(appText(R.string.later)) }
-            }
         )
     }
 

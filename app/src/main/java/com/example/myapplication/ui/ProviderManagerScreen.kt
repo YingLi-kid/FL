@@ -232,7 +232,7 @@ private fun ProviderDetail(
             Spacer(Modifier.height(12.dp))
             provider.credentialFields.forEach { field ->
                 // Keep editor state synchronous: a DataStore round trip must not drop keystrokes.
-                var draft by rememberSaveable(provider.id, field.key) { mutableStateOf<String?>(null) }
+                var draft by androidx.compose.runtime.remember(provider.id, field.key) { mutableStateOf<String?>(null) }
                 val storedValue = config.credentials[field.key] ?: ""
                 val value = draft ?: storedValue
                 OutlinedTextField(

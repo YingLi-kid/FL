@@ -28,7 +28,19 @@ internal object AppUpdates {
         .header("X-GitHub-Api-Version", "2022-11-28")
         .build()
 
-    suspend fun check(currentVersion: String): AppUpdate? = suspendCancellableCoroutine { continuation ->
+    suspend fun check(currentVersion: String): AppUpdate? {
+        val releases = JSONArray()
+        var page = 1
+        do {
+            val url = request.url.newBuilder().addQueryParameter("page", page.toString()).build()
+            val batch = JSONArray(readPage(request.newBuilder().url(url).build()))
+            for (i in 0 until batch.length()) releases.put(batch.get(i))
+            page++
+        } while (batch.length() == 20)
+        return selectUpdate(currentVersion, releases.toString())
+    }
+
+    private suspend fun readPage(request: Request): String = suspendCancellableCoroutine { continuation ->
         val call = client.newCall(request)
         continuation.invokeOnCancellation { call.cancel() }
         call.enqueue(object : Callback {
@@ -42,7 +54,7 @@ internal object AppUpdates {
                         if (!it.isSuccessful) throw IOException(appText(R.string.update_http_error, it.code))
                         val source = it.body?.source() ?: throw IOException(appText(R.string.update_empty_response))
                         if (source.request(responseLimit + 1)) throw IOException(appText(R.string.update_response_too_large))
-                        selectUpdate(currentVersion, source.readUtf8())
+                        source.readUtf8()
                     }
                 }
                 continuation.resumeWith(result)

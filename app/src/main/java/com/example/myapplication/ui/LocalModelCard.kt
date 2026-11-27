@@ -30,6 +30,8 @@ import androidx.compose.ui.unit.dp
 import com.example.myapplication.service.LocalSpeechBackend
 import com.example.myapplication.service.ModelImportStage
 import kotlinx.coroutines.CancellationException
+import androidx.compose.runtime.collectAsState
+import com.example.myapplication.service.ModelImportService
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -53,13 +55,20 @@ internal fun LocalModelCard(
     var source by rememberSaveable { mutableStateOf("") }
     var customSource by rememberSaveable { mutableStateOf(false) }
     var showDownloadFiles by rememberSaveable { mutableStateOf(false) }
-    var importing by remember { mutableStateOf(false) }
-    var importStage by remember { mutableStateOf(ModelImportStage.OPENING) }
+    val transfer by ModelImportService.status.collectAsState()
+    val importing = transfer.active && transfer.model == backend.id
+    val importStage = transfer.stage
     var cancelling by remember { mutableStateOf(false) }
     var waitingForFile by remember { mutableStateOf(false) }
-    val busy = job != null
+    val busy = job != null || importing
+    LaunchedEffect(transfer.active, transfer.model, transfer.message) {
+        if (!transfer.active && transfer.model == backend.id) {
+            status = transfer.message
+            installed = store.isInstalled()
+        }
+    }
 
-    LaunchedEffect(importing, importStage, progress / 1_000_000) {
+    LaunchedEffect(importing, importStage, transfer.bytes / 1_000_000) {
         waitingForFile = false
         if (importing && importStage != ModelImportStage.INSTALLING) {
             delay(10_000)
@@ -67,19 +76,16 @@ internal fun LocalModelCard(
         }
     }
 
-    fun start(initialProgress: Long, isImport: Boolean = false, operation: suspend () -> Unit) {
+    fun start(initialProgress: Long, operation: suspend () -> Unit) {
         if (job != null) return
         progress = initialProgress
         status = ""
-        importing = isImport
-        importStage = ModelImportStage.OPENING
         cancelling = false
         job = scope.launch {
             try {
                 operation()
-                if (isImport) status = appText(R.string.model_import_success)
             } catch (e: CancellationException) {
-                status = if (isImport) appText(R.string.model_import_cancelled) else appText(R.string.model_download_paused)
+                status = appText(R.string.model_download_paused)
                 throw e
             } catch (e: Exception) {
                 status = when (e) {
@@ -92,7 +98,6 @@ internal fun LocalModelCard(
             } finally {
                 downloaded = store.downloadedBytes()
                 installed = store.isInstalled()
-                importing = false
                 cancelling = false
                 job = null
             }
@@ -100,29 +105,31 @@ internal fun LocalModelCard(
     }
 
     val importZip = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) start(0, isImport = true) {
-            store.importZip(
-                open = { context.contentResolver.openInputStream(uri) ?: throw IOException(appText(R.string.model_zip_open_error)) },
-                progress = { bytes, stage ->
-                    importStage = stage
-                    progress = bytes
-                }
-            )
-        }
+        if (uri != null) try {
+            cancelling = false
+            status = ""
+            ModelImportService.start(context, backend.id, uri)
+        } catch (e: Exception) { status = e.localizedMessage ?: appText(R.string.operation_error) }
     }
 
+    val pickZip = { importZip.launch(arrayOf("application/zip", "application/x-zip-compressed", "application/octet-stream")) }
+    val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { pickZip() }
     GlassCard {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(appText(R.string.model_selected, backend.name), style = MaterialTheme.typography.titleMedium)
             Button(
-                enabled = !busy,
-                onClick = { importZip.launch(arrayOf("application/zip", "application/x-zip-compressed", "application/octet-stream")) }
+                enabled = !busy && !transfer.active,
+                onClick = {
+                    if (android.os.Build.VERSION.SDK_INT >= 33 && context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED)
+                        notificationPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                    else pickZip()
+                }
             ) { Text(appText(R.string.import_zip)) }
             Text(appText(R.string.model_list), style = MaterialTheme.typography.titleMedium)
             models.forEach { model ->
                 FilterChip(
                     selected = model.id == backend.id,
-                    enabled = !busy,
+                    enabled = !busy && !transfer.active,
                     onClick = { onSelectModel(model.id) },
                     label = { Text(model.name) },
                     modifier = Modifier.fillMaxWidth()
@@ -133,13 +140,13 @@ internal fun LocalModelCard(
             when {
                 busy -> {
                     LinearProgressIndicator(
-                        progress = { (progress.toDouble() / store.downloadBytes).toFloat().coerceIn(0f, 1f) },
+                        progress = { ((if (importing) transfer.bytes else progress).toDouble() / store.downloadBytes).toFloat().coerceIn(0f, 1f) },
                         modifier = Modifier.fillMaxWidth()
                     )
                     if (importing) {
                         Text(when (importStage) {
                             ModelImportStage.OPENING -> appText(R.string.model_zip_opening)
-                            ModelImportStage.READING -> appText(R.string.model_zip_reading, progress / 1_000_000, (store.downloadBytes + 500_000) / 1_000_000)
+                            ModelImportStage.READING -> appText(R.string.model_zip_reading, transfer.bytes / 1_000_000, (store.downloadBytes + 500_000) / 1_000_000)
                             ModelImportStage.INSTALLING -> appText(R.string.model_installing)
                         })
                         if (waitingForFile && !cancelling) {
@@ -150,7 +157,7 @@ internal fun LocalModelCard(
                     }
                     OutlinedButton(enabled = !cancelling, onClick = {
                         cancelling = true
-                        job?.cancel()
+                        if (importing) ModelImportService.cancel(context) else job?.cancel()
                     }) { Text(if (cancelling) appText(R.string.stopping) else if (importing) appText(R.string.cancel_import) else appText(R.string.pause)) }
                 }
                 installed -> {

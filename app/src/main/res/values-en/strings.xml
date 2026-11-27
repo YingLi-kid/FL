@@ -211,7 +211,7 @@
     <string name="preset_xiaochun_description">Mandarin female voice · Calm and natural</string>
     <string name="preview_audio">Preview</string>
     <string name="preview_sample">Preview sample</string>
-    <string name="privacy_body">Your privacy matters:\n\n1. Online mode sends recordings or text to the selected provider. Offline recordings, text and synthesis stay on your device.\n2. The app requires no account and does not collect your name or phone number.\n3. API keys are stored on your device and used only to authenticate requests to their providers.\n4. The microphone is used for recording. Android’s file picker handles import and export. Generated speech and text are stored on the device and can be deleted from Generation history.</string>
+    <string name="privacy_body">Your privacy matters:\n\n1. Online mode sends recordings or text to the selected provider. Offline recordings, text and synthesis stay on your device.\n2. The app requires no account and does not collect your name or phone number.\n3. API keys are stored on your device and used only to authenticate requests to their providers.\n4. The microphone is used for recording. Android’s file picker handles import and export. Generated speech and text are stored on the device and can be deleted from Generation history.\n5. On launch, the app checks GitHub for public release information. The request contains no recordings, scripts or provider keys.</string>
     <string name="privacy_title">Privacy policy</string>
     <string name="provider_aliyun">Alibaba Cloud · Model Studio CosyVoice</string>
     <string name="provider_aliyun_backend">Alibaba Cloud Model Studio · CosyVoice</string>
@@ -308,7 +308,7 @@
     <string name="update_check_error">Could not check for updates. Check your connection and try again</string>
     <string name="update_checking">Checking GitHub releases…</string>
     <string name="update_current">You’re on the latest version, %1$s</string>
-    <string name="update_description">You have version %1$s. Download the APK from the official GitHub release and confirm installation in Android.</string>
+    <string name="update_description">🎉 You have version %1$s. Download the APK from the official GitHub release and confirm installation in Android.</string>
     <string name="update_empty_response">The release service did not return version information</string>
     <string name="update_http_error">Release service returned HTTP %1$s</string>
     <string name="update_invalid_current_version">The current version number could not be read</string>
@@ -325,4 +325,7 @@
     <string name="voice_source_import">Import</string>
     <string name="voice_source_recording">Recording</string>
     <string name="voice_source_upload">Upload</string>
+    <string name="auto_language">Automatic detection</string>
+    <string name="poll_failed">Voice status check failed and will retry. Check your network and API key. %1$s</string>
+    <string name="credential_save_failed">Could not save the API key. Please retry.</string>
 </resources>

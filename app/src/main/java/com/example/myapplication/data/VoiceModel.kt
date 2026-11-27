@@ -34,7 +34,7 @@ val supportedLanguages = listOf(
 )
 
 fun languageLabel(code: String): String =
-    supportedLanguages.firstOrNull { it.code == code }?.label ?: code
+    if (code == "auto") appText(R.string.auto_language) else supportedLanguages.firstOrNull { it.code == code }?.label ?: code
 
 // 语言编码 → 阿里云 CosyVoice language_hints（不支持的返回 null，由系统自动检测语种）
 fun cosyVoiceLanguageHint(code: String): String? = when (code) {

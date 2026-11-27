@@ -88,7 +88,9 @@ private val bottomTabs get() = listOf(
 internal fun HomeScreen(
     generation: SpeechGeneration = rememberSpeechGeneration(),
     language: AppLanguage = AppLanguage.CHINESE,
-    onLanguageChange: ((AppLanguage) -> Unit)? = null
+    onLanguageChange: ((AppLanguage) -> Unit)? = null,
+    checkingUpdate: Boolean = false,
+    onCheckForUpdate: () -> Unit = {}
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -133,7 +135,8 @@ internal fun HomeScreen(
     val backend = backends.firstOrNull { it.id == selections[mode] } ?: backends.first()
     val localBackend = backend as? LocalSpeechBackend
     val cloudBackend = backend as? CloudSpeechBackend
-    val modelInstalled = remember(context, currentScreen, backend) { localBackend?.isInstalled(context) ?: true }
+    val importState by com.example.myapplication.service.ModelImportService.status.collectAsState()
+    val modelInstalled = remember(context, currentScreen, backend, importState.active) { localBackend?.isInstalled(context) ?: true }
     val localSupported = localBackend?.isSupported() ?: true
     val activeVoices = voiceProfiles.filter(backend::acceptsVoice)
     val credentials = providerConfigs[backend.id]?.credentials.orEmpty()
@@ -145,16 +148,24 @@ internal fun HomeScreen(
         if ((localSpeechBackends.isNotEmpty() && storedMode == null) || !service.credentialsReady(credentials)) {
             return@LaunchedEffect
         }
+        var reportedFailure = false
         while (pendingIds.isNotEmpty()) {
             for (id in pendingIds) {
                 val profile = voiceProfiles.firstOrNull { it.id == id } ?: continue
-                val status = service.refreshStatus(credentials, requireNotNull(profile.speakerId))
+                val status = try {
+                    service.refreshStatus(credentials, requireNotNull(profile.speakerId))
+                } catch (e: java.io.IOException) {
+                    if (!reportedFailure) showMessage(appText(R.string.poll_failed, e.message.orEmpty()))
+                    reportedFailure = true
+                    break
+                }
+                if (status != null) reportedFailure = false
                 if (status == "OK" || status == "UNDEPLOYED") {
                     voiceRepository.updateStatus(id, status)
                     showMessage(if (status == "OK") appText(R.string.cloud_voice_ready, profile.name) else appText(R.string.cloud_voice_review_failed, profile.name))
                 }
             }
-            delay(10000)
+            delay(if (reportedFailure) 60000 else 10000)
         }
     }
 
@@ -242,12 +253,18 @@ internal fun HomeScreen(
                         generation = generation,
                         language = language,
                         onLanguageChange = onLanguageChange,
+                        checkingUpdate = checkingUpdate,
+                        onCheckForUpdate = onCheckForUpdate,
                         onBack = { currentScreen = Screen.HOME }
                     )
                     Screen.PROVIDERS -> ProviderManagerScreen(
                         configs = providerConfigs,
                         onSaveCredential = { id, field, value ->
-                            scope.launch { providerRepository.setCredential(id, field, value) }
+                            scope.launch {
+                                try { providerRepository.setCredential(id, field, value) }
+                                catch (e: kotlinx.coroutines.CancellationException) { throw e }
+                                catch (_: Exception) { showMessage(appText(R.string.credential_save_failed)) }
+                            }
                         },
                         onBack = { currentScreen = providerReturn },
                         initialProviderId = initialProviderId

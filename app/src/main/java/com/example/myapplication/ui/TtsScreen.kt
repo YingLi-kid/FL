@@ -283,7 +283,7 @@ internal fun TtsScreen(
         GlassCard {
             SectionTitle(appText(R.string.output_language), icon = Icons.Rounded.Translate)
             Spacer(Modifier.height(12.dp))
-            LanguageSelector(
+            if (!local) Text(appText(R.string.auto_language)) else LanguageSelector(
                 selected = selectedLanguage,
                 onSelect = { if (!isGenerating) selectedLanguage = it },
                 languages = backend.outputLanguages

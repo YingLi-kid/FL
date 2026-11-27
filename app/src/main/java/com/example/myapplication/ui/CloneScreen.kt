@@ -88,6 +88,9 @@ import java.io.File
  * 克隆音色页：授权声明 → 命名/语言 → 录音或上传样本 → 真实复刻训练 → 已克隆音色列表。
  * 已配置阿里云服务商时走真实声音复刻（base64 上传 + 审核轮询），未配置服务商时提示完成配置。
  */
+private val submissionLock = kotlinx.coroutines.sync.Mutex()
+private var submissionActive by mutableStateOf(false)
+
 @Composable
 fun CloneScreen(
     voices: List<VoiceProfile>,
@@ -172,10 +175,12 @@ fun CloneScreen(
 
     val sampleExists = samplePath?.let { File(it).isFile } == true
     val transcriptReady = !backend.requiresReferenceText || referenceText.isNotBlank()
-    val canClone = agreed && name.isNotBlank() && sampleExists && transcriptReady && !isCloning && !isLoadingSample
+    val canClone = !submissionActive && agreed && name.isNotBlank() && sampleExists && transcriptReady && !isCloning && !isLoadingSample
 
     LaunchedEffect(isCloning) {
         if (!isCloning) return@LaunchedEffect
+        if (!submissionLock.tryLock()) { isCloning = false; return@LaunchedEffect }
+        submissionActive = true
         cloneError = null
         try {
             check(backend.credentialsReady(credentials)) { appText(R.string.provider_key_required) }
@@ -204,6 +209,8 @@ fun CloneScreen(
             cloneError = appText(R.string.clone_error, e.message ?: appText(R.string.unknown_error))
             onShowMessage(cloneError!!)
         } finally {
+            submissionActive = false
+            submissionLock.unlock()
             isCloning = false
             cloneProgress = 0f
             cloneStatusText = ""

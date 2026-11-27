@@ -71,7 +71,7 @@ internal class SpeechGeneration(private val scope: CoroutineScope) {
                 }
                 val record = withContext(NonCancellable) {
                     try {
-                        SpeechHistory(app).save(temporary, text, voice.name, language, backend.id, backend.format)
+                        SpeechHistory(app).save(temporary, text, voice.name, if (backend is LocalSpeechBackend) language else "auto", backend.id, backend.format)
                     } finally {
                         withContext(Dispatchers.IO) { temporary.delete() }
                     }

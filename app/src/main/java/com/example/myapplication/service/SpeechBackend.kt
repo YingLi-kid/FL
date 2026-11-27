@@ -191,7 +191,10 @@ object CosyVoiceBackend : CloudSpeechBackend {
     }
 
     override suspend fun refreshStatus(credentials: Map<String, String>, speakerId: String): String? =
-        (AliyunVoice().getVoiceStatus(apiKey(credentials), speakerId) as? AliyunVoice.Result.Success)?.status
+        when (val result = AliyunVoice().getVoiceStatus(apiKey(credentials), speakerId)) {
+            is AliyunVoice.Result.Success -> result.status
+            is AliyunVoice.Result.Failure -> throw java.io.IOException(result.message)
+        }
 
     private fun apiKey(credentials: Map<String, String>): String =
         requireNotNull(credentials["apiKey"]?.trim()?.takeIf { it.isNotEmpty() }) { appText(R.string.api_key_required) }

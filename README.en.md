@@ -143,7 +143,7 @@ app/src/main/java/com/example/myapplication/
 
 - Coverage across device manufacturers, unreliable networks, background transitions, and process termination is incomplete. Restoring a form does not guarantee that a cloud task continues in every situation.
 - Pending voice status is polled while the app runs; no background scheduler is implemented. Removing a local voice entry does not delete the provider's cloud voice.
-- Checking for updates requires access to GitHub. When a newer version is available, the app opens the APK download link and Android handles installation.
+- After the startup disclaimer, the app checks GitHub for updates. If a newer APK is available, choose Download APK or Later. When you are up to date or offline, startup stays quiet. You can retry in Settings → Check for updates.
 - The application ID is `com.example.myapplication`. The public preview APK uses a dedicated release signing key, which maintainers must back up as described above. Credential encryption and backup policy need further work.
 - Not every combination of language, preset voice, and model has been validated. Refer to current provider documentation for pricing and capabilities.
 

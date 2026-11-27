@@ -92,8 +92,13 @@ internal class VerifiedModelStore(context: Context, spec: ModelPackageSpec) : Lo
                             if (body.contentLength() >= 0 && body.contentLength() != asset.bytes) {
                                 throw IOException(appText(R.string.model_source_size_mismatch))
                             }
-                            offset = 0L
-                            asset.bytes
+                            var remaining = offset
+                            while (remaining > 0) {
+                                currentCoroutineContext().ensureActive()
+                                val skipped = body.source().readByteArray(minOf(remaining, 65536L)).size
+                                remaining -= skipped
+                            }
+                            asset.bytes - offset
                         }
                         206 -> {
                             if (response.header("Content-Range") != "bytes $offset-$lastByte/${asset.bytes}") {
@@ -125,12 +130,19 @@ internal class VerifiedModelStore(context: Context, spec: ModelPackageSpec) : Lo
     ) = transfer(skipInstalled = false) {
         restoreInstallation()
         val stage = root.resolve("import")
-        discardStage(stage)
-        checkSpace(downloadBytes)
+        val reusable = files.filter { asset ->
+            val existing = stage.resolve(asset.name)
+            if (existing.length() != asset.bytes) false else try {
+                verify(existing, asset)
+                true
+            } catch (_: IOException) { false }
+        }.toSet()
+        files.filterNot { it in reusable }.forEach { stage.resolve(it.name).delete() }
+        checkSpace(downloadBytes - reusable.sumOf { it.bytes })
         stage.mkdirs()
         val found = mutableSetOf<ModelAsset>()
         var completed = 0L
-        try {
+        run {
             progress(0, ModelImportStage.OPENING)
             val input = runInterruptible { open() }
             ZipInputStream(input.buffered()).use { zip ->
@@ -151,6 +163,14 @@ internal class VerifiedModelStore(context: Context, spec: ModelPackageSpec) : Lo
                     }
                     if (!found.add(asset)) throw IOException(appText(R.string.model_zip_duplicate_file))
                     val target = stage.resolve(asset.name)
+                    if (asset in reusable) {
+                        val size = copy(zip, asset.bytes, { _, _, _ -> }, interruptible = true) {
+                            progress(completed + it, ModelImportStage.READING)
+                        }
+                        if (size != asset.bytes) throw IOException(appText(R.string.model_zip_size_mismatch, asset.name))
+                        completed += size
+                        continue
+                    }
                     val hash = MessageDigest.getInstance("SHA-256")
                     val bytes = target.outputStream().buffered().use { out ->
                         copy(zip, asset.bytes, { buffer, start, count ->
@@ -173,8 +193,6 @@ internal class VerifiedModelStore(context: Context, spec: ModelPackageSpec) : Lo
             progress(completed, ModelImportStage.INSTALLING)
             promote(stage)
             discardStage(root.resolve("download"))
-        } finally {
-            discardStage(stage)
         }
     }
 
@@ -275,7 +293,6 @@ internal class VerifiedModelStore(context: Context, spec: ModelPackageSpec) : Lo
         private val http = OkHttpClient.Builder()
             .connectTimeout(12, TimeUnit.SECONDS)
             .readTimeout(15, TimeUnit.SECONDS)
-            .callTimeout(90, TimeUnit.SECONDS)
             .followSslRedirects(false)
             .build()
     }

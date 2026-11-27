@@ -7,19 +7,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
-/*
- * 服务商配置存储层。
- *
- * 当前实现：DataStore 明文存储（实现简单）。
- * 密钥属于敏感信息，正式发布前建议替换为 Android Keystore 加密实现——
- * 只需在 UI 层替换 ProviderRepository 的数据源，接口不变，页面无需改动。
- */
-
-// 应用级单例 DataStore
-private val Context.providerDataStore by preferencesDataStore(name = "provider_config")
+private val Context.providerDataStore by preferencesDataStore(
+    name = "provider_config", produceMigrations = { listOf(CredentialMigration) }
+)
 
 // Keep the existing preference values so upgrading preserves both selections.
 internal enum class SpeechMode(val preferenceValue: String) {
@@ -56,16 +51,16 @@ class ProviderRepository(private val context: Context) {
         context.providerDataStore.data.map { prefs ->
             serviceProviders.associate { provider ->
                 val credentials = provider.credentialFields.mapNotNull { field ->
-                    prefs[stringPreferencesKey("cred_${provider.id}_${field.key}")]
-                        ?.let { field.key to it }
+                    prefs[stringPreferencesKey("sealed_${provider.id}_${field.key}")]
+                        ?.let { encrypted -> CredentialCipher.read(encrypted)?.let { field.key to it } }
                 }.toMap()
                 provider.id to ProviderRuntimeConfig(credentials)
             }
-        }
+        }.flowOn(Dispatchers.IO)
 
     suspend fun setCredential(providerId: String, fieldKey: String, value: String) {
         context.providerDataStore.edit { prefs ->
-            prefs[stringPreferencesKey("cred_${providerId}_$fieldKey")] = value
+            prefs[stringPreferencesKey("sealed_${providerId}_$fieldKey")] = CredentialCipher.write(value)
         }
     }
 }
